@@ -8,7 +8,6 @@
 
 using namespace std;
 
-#define RECORD_FRE	100		//Interval of recording
 bool MTO = true;// 0 for no transfer; 1 for transfer
 
 int generation;	//current generation

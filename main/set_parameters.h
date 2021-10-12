@@ -240,7 +240,7 @@ int GetProblemInfo(CSimpleIni &cfgs, ProblemInfo &base_info, bool use_unified)
 {
     //load global problem data
     string problem_def = cfgs.GetValue("global", "problem_def", "MaTDE10SOTasks");
-    string bin_root = cfgs.GetValue("global", "bin_root", "/fred/oz121/hxu/EMTO_GPU/bin/");
+    string bin_root = cfgs.GetValue("global", "bin_root", "/fred/oz121/hxu/AEMTO/bin/");
     int task_id = base_info.task_id;
     base_info.problem_def = problem_def;
     base_info.bin_root = bin_root;

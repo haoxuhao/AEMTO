@@ -45,9 +45,6 @@ struct EvolveRewards
 	int update_num;
 };
 
-
-typedef Evaluator FuncEval;
-
 class EA
 {
 protected:
@@ -56,20 +53,18 @@ protected:
     NodeInfo                node_info_;
     EAInfo                  EA_info_;
     Random                  random_;
-    FuncEval *func;
 public:
                             EA();
                             ~EA();
-    virtual int             InitializePopulation(Population & population);
     virtual int             Initialize(IslandInfo island_info, ProblemInfo problem_info, EAInfo EA_info);
     virtual int             Uninitialize();
-    int                     InitializePopulation(Population &pop, unique_ptr<FuncEval> &func_eval);
+    int                     InitializePopulation(Population &pop, unique_ptr<Evaluator> &func_eval);
     real                    CheckBound(real to_check_elements, real min_bound, real max_bound);
     Individual              FindBestIndividual(Population & population);
     virtual string          GetParameters(DEInfo DE_info)=0;
-    virtual real            Run(Population & population)=0;
+    virtual real            Run(Population & population, unique_ptr<Evaluator> &eval)=0;
     virtual int             ConfigureEA(EAInfo EA_info)=0;
-    virtual Population      EvaluatePop(Population &p, unique_ptr<FuncEval> &eval);
+    virtual Population      EvaluatePop(Population &p, unique_ptr<Evaluator> &eval);
     virtual Population      Survival(Population &pop, Population &offsp, EvolveRewards &out);
     /**
      * Populaiton sort according to fitness values
@@ -88,8 +83,6 @@ public:
      * Relative improvement as default setting
     */
     virtual real            PopImprovement(Population &pop_curr, Population &pop_pre);
-
-    void set_func(Evaluator *func) {this->func = func;}
 };
 
 class DE_CPU : public EA
@@ -97,15 +90,15 @@ class DE_CPU : public EA
 protected:
     DEInfo                  DE_info_;
     int                     Reproduce(Population & population);
+    int                     ReproduceV2(Population & population, unique_ptr<Evaluator> &eval);
     
 public:
                             DE_CPU(){};
                             DE_CPU(NodeInfo node_info);
                             ~DE_CPU();
     virtual int             Initialize(IslandInfo island_info, ProblemInfo problem_info, DEInfo DE_info);
-    virtual int             InitializePopulation(Population & population);
     virtual int             Uninitialize();
-    virtual real            Run(Population & population);
+    virtual real            Run(Population & population, unique_ptr<Evaluator> &eval);
     virtual string          GetParameters(DEInfo DE_info);
     virtual int             ConfigureEA(DEInfo DE_info);
     virtual Population      Variation(Population &pop);
@@ -125,9 +118,9 @@ class GA_CPU : public EA
          * Return update num
          * The same as MFEA2 did.
          */
-        int                     Reproduce(Population &pop, unique_ptr<FuncEval> &eval_func);
+        int                     Reproduce(Population &pop, unique_ptr<Evaluator> &eval_func);
         virtual string          GetParameters(DEInfo DE_info);
-        virtual real             Run(Population & population);
+        virtual real            Run(Population & population, unique_ptr<Evaluator> &eval) {return 0;};
         virtual int             ConfigureEA(EAInfo EA_info);
         Individual              crossover(const Individual &p1, const Individual &p2, const vector<real> &cf);
         Individual              mutate(Individual &p);

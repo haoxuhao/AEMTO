@@ -1,5 +1,4 @@
 #include "record.h"
-
 #include "util.h"
 #include <fstream>
 

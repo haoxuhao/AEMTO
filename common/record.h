@@ -6,8 +6,6 @@
 #include <map>
 #include "json.hpp"
 #include "config.h"
-#include "comm.h"
-
 
 using json = nlohmann::json;
 

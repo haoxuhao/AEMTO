@@ -14,60 +14,39 @@ ENDIF(DINSIGHT)
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 
 if(CMAKE_COMPILER_IS_GNUCXX)
-set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
-# set(CMAKE_CXX_FLAGS "-O2 ${CMAKE_CXX_FLAGS}") # compiler optimization
-# message(STATUS "compiler optimization:-O2")
+set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}") # c++11 required.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+set(CMAKE_CXX_FLAGS "-O2 ${CMAKE_CXX_FLAGS}") # compiler optimization.
 endif(CMAKE_COMPILER_IS_GNUCXX)
-
-# set main file 
-OPTION(AEMTO "Option AEMTO" ON) #default
-IF(AEMTO)
-    SET(exec_name AEMTO) 
-    SET(MAIN_FILE "main/aemto.cc")
-ENDIF(AEMTO)
-
-OPTION(MATDE "Option MATDE" OFF)
-IF(MATDE)
-    SET(exec_name MATDE) 
-    SET(MAIN_FILE "main/matde.cc")    
-    SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin/MaTDE)
-ENDIF(MATDE)
-
-OPTION(MATDE "Option SBO" OFF)
-IF(SBO)
-    SET(exec_name sbo)
-    SET(MAIN_FILE "main/sbo.cc")    
-    SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin/SBO)
-ENDIF(SBO)
-
-OPTION(MATDE "Option MFEA" OFF)
-IF(MFEA)
-    SET(exec_name MFEA)
-    SET(MAIN_FILE "main/mfea.cc")    
-    SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin/MFEA)
-ENDIF(MFEA)
-
-OPTION(UNITEST "Option UNITEST" OFF)
-IF(UNITEST)
-    SET(exec_name UNITEST) 
-    SET(MAIN_FILE "main/unittest.cc")    
-    SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
-ENDIF(UNITEST)
 
 find_package(Threads)
 INCLUDE_DIRECTORIES(oss)
 INCLUDE_DIRECTORIES(common)
-INCLUDE_DIRECTORIES(src)
-
-AUX_SOURCE_DIRECTORY(src DIR_SRCS)
 AUX_SOURCE_DIRECTORY(common DIR_SRCS)
+AUX_SOURCE_DIRECTORY(oss DIR_SRCS)
 
-# set openmp
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+SET(CMAKE_CXX_COMPILER g++)
 
-SET(CMAKE_CXX_COMPILER mpicxx)
-# SET(CMAKE_CXX_COMPILER g++)
+set(exec_name AEMTO)
+set(main_file "main/aemto.cc")
+message(STATUS "build ${exec_name}")
+ADD_EXECUTABLE(${exec_name} ${main_file} ${DIR_SRCS})
+TARGET_LINK_LIBRARIES(${exec_name} ${CMAKE_THREAD_LIBS_INIT})
 
-ADD_EXECUTABLE(${exec_name} ${MAIN_FILE} ${DIR_SRCS})
-target_link_libraries(${exec_name} mpi)
+set(exec_name SBO)
+set(main_file "main/sbo.cc")
+message(STATUS "build ${exec_name}")
+ADD_EXECUTABLE(${exec_name} ${main_file} ${DIR_SRCS})
+TARGET_LINK_LIBRARIES(${exec_name} ${CMAKE_THREAD_LIBS_INIT})
+
+set(exec_name MATDE)
+set(main_file "main/matde.cc")
+message(STATUS "build ${exec_name}")
+ADD_EXECUTABLE(${exec_name} ${main_file} ${DIR_SRCS})
+TARGET_LINK_LIBRARIES(${exec_name} ${CMAKE_THREAD_LIBS_INIT})
+
+set(exec_name MFEA)
+set(main_file "main/mfea.cc")
+message(STATUS "build ${exec_name}")
+ADD_EXECUTABLE(${exec_name} ${main_file} ${DIR_SRCS})
 TARGET_LINK_LIBRARIES(${exec_name} ${CMAKE_THREAD_LIBS_INIT})

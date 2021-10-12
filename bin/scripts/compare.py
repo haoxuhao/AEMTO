@@ -170,9 +170,24 @@ def build_comparisons():
         ]
     return compared_res
 
+def ci():
+    matde_res_dirs = [
+        'Results/matde_problem_ref/zero_10',
+        'Results/matde_problem/DE/mto/zero_10',
+    ]
+    arm_res_dirs = [
+        'Results/ArmD50_Ref/zero_10',
+        'Results/Arm/DE/mto/zero_10',
+    ]
+    compared_res = {
+        'arm_zero_10': [get_results(res) for res in arm_res_dirs],
+        'matde_zero_10': [get_results(res) for res in matde_res_dirs]
+    }
+    return compared_res
+
 
 if __name__ == "__main__":
-    results_to_compare = build_comparisons()
+    results_to_compare = ci()
 
     total_summeray, normalized_scores_total, \
         f1_scores_total = summeray_compare(results_to_compare, runs=20)
@@ -187,5 +202,4 @@ if __name__ == "__main__":
         ['%.4f' % a for a in normalized_scores_total])))
     print(" .  f1 scores: {}".format(', '.join(
         ['%.2f' % a for a in f1_scores_total])))
-
     print('\n=============================================================')

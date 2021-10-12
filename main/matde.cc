@@ -89,7 +89,7 @@ vector<vector<gene>> K_archive;
 
 // ProblemInfo problem_infos[total_task_num];
 // BenchFuncEvaluator manytask_funs[total_task_num];
-vector<unique_ptr<FuncEval>> manytask_funs;
+vector<unique_ptr<Evaluator>> manytask_funs;
 Random random_;
 string result_dir;
 GA_CPU ga_cpu;

@@ -8,9 +8,9 @@
 echo "batch file args: $*"
 if [ "$#" != "2" ] # submit through `sbatch ameto.sh` not by the run.sh 
 then
-    problemset="ArmFinal"
+    problemset="Arm"
     params_file="./cfgs/params.cfg"
-    experiment="${problemset}/pmto/DE/mto"
+    experiment="${problemset}/DE/mto"
     results_dir="Results/${experiment}"
     mkdir -p $results_dir
     cp $params_file $results_dir
@@ -30,7 +30,7 @@ echo "param file $params_file; results dir $results_dir"
 tags=(zero)
 
 # number of tasks for each problem, e.g. here test problem is zero_200
-total_tasks=(5)
+total_tasks=(10)
 
 tasks_start=1
 

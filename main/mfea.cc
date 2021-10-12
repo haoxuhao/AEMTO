@@ -22,7 +22,6 @@ struct Chromosome
 };
 typedef Chromosome Chro;
 
-const int RECORD_FRE = 100;
 const real pm = 1;
 bool MTO = true;
 int generation;	
