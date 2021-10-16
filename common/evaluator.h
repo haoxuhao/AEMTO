@@ -1,60 +1,61 @@
 #ifndef __EVALUATOR_H__
 #define __EVALUATOR_H__
 
-#include "CEC2014.h"
-#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <functional>
 #include "config.h"
+#include "Eigen/Dense"
 
 
 class Evaluator 
 {
+protected:
+    ProblemInfo problem_info_;
 public:
-    virtual real EvaluateFitness(const vector<real> & elements) = 0;
-    virtual int	 Initialize(const ProblemInfo &problem_info) = 0;
-	virtual int	 Uninitialize() {return 0;};
+    virtual Real EvaluateFitness(const vector<Real> & elements) = 0;
+    virtual ~Evaluator() {};
 };
 
-
-class BenchFuncEvaluator : public Evaluator, public CEC2014
+class BenchFuncEvaluator : public Evaluator 
 {
 private: 
-    int task_id_;
-    bool flag_composition_;
-    int                     calc_dim_;
-    ProblemInfo             problem_info_;
-    real                    scale_rate_;
-    real                    fixed_shift_;
-    int                     rotation_flag_;
-    int					    LoadData_matea();
-    void                    load_shifts_from_singlefile(string file_name);
-    int                     transfer_to_original_space(const vector<real> &elements);
+    Real scale_rate_;
+    Eigen::MatrixXd rM_;
+    bool is_rotate_{false};
+    Eigen::VectorXd shift_;
+    Eigen::VectorXd bias_vec_;
+    const unordered_map<string, vector<Real> > func_search_range {
+        {"sphere", {-100, 100}}, 
+        {"weierstrass", {-0.5, 0.5}},
+        {"rosenbrock", {-50, 50}}, 
+        {"ackley", {-50, 50}}, 
+        {"schwefel", {-500, 500}},
+        {"griewank", {-100, 100}}, 
+        {"rastrigin", {-50, 50}}
+    };
     
+
+    void LoadTaskData();
 public:
-    BenchFuncEvaluator(){};
-    ~BenchFuncEvaluator(){};
-    virtual int				Initialize(const ProblemInfo &problem_info);
-	virtual int				Uninitialize();
-    virtual real			EvaluateFitness(const vector<real> & elements);
-    virtual real			EvaluateFitness(const vector<real> & elements, mutex &mtx);
+    BenchFuncEvaluator(const ProblemInfo& probleminfo);
+    virtual ~BenchFuncEvaluator(){};
+    virtual Real EvaluateFitness(const vector<Real> & elements);
 };
 
 class ArmEvaluator : public Evaluator
 {
 private: 
-    ProblemInfo             problem_info_;
-    int					    load_data();
-    vector<real>            fw_kinematics(vector<real> & commad);
-
-    vector<real> task;
+    vector<Real> fw_kinematics(vector<Real> & commad);
+    vector<Real> task;
     int n_dofs;
-    real angular_range;
-    vector<real> lengths;  
-
+    Real angular_range;
+    vector<Real> lengths;  
+    void LoadTaskData();
 public:
-    ArmEvaluator(){};
-    ~ArmEvaluator(){};
-    virtual int						Initialize(const ProblemInfo &problem_info);
-	virtual int						Uninitialize() {return 0;};
-    virtual real					EvaluateFitness(const vector<real> & elements);
+    ArmEvaluator(const ProblemInfo &problem_info);
+    virtual ~ArmEvaluator(){};
+    virtual Real EvaluateFitness(const vector<Real> & elements);
 };
+
 #endif

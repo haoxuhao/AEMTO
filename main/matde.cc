@@ -87,8 +87,6 @@ vector<vector<gene>> K_archive;
 #include "random.h"
 #include "record.h"
 
-// ProblemInfo problem_infos[total_task_num];
-// BenchFuncEvaluator manytask_funs[total_task_num];
 vector<unique_ptr<Evaluator>> manytask_funs;
 Random random_;
 string result_dir;
@@ -97,15 +95,14 @@ vector<Record> record_tasks;
 vector<IslandInfo> island_infos;
 vector<ProblemInfo> problem_infos;
 vector<EAInfo> ea_infos;
+Args args;
 
 int eval_init(int argc, char* argv[])
 {
-    Args args;
     IslandInfo island_info;
     ProblemInfo problem_info;
-    NodeInfo node_info;
     EAInfo EA_info;
-    int ret = SetParameters(island_info, problem_info, node_info, \
+    int ret = SetParameters(island_info, problem_info, \
             EA_info, args, argc, argv);
     
     if(ret != 0)
@@ -119,37 +116,26 @@ int eval_init(int argc, char* argv[])
     mkdirs(result_dir.c_str());
     cout << "result dir " << result_dir << endl;
     
-    CSimpleIni cfgs;
-    fprintf(stderr, "Tasks define file: %s\n", args.tasks_def.c_str());
-    
-    cfgs.LoadFile(args.tasks_def.c_str());
 	assert(args.total_tasks.size() == total_task_num);
-
     for(int i=0; i<args.total_tasks.size(); i++)
     {
         problem_info.task_id = args.total_tasks[i];
         problem_info.total_runs = args.total_runs;
-        if(GetProblemInfo(cfgs, problem_info, args.use_unified_space) != 0) 
+        if(GetProblemInfo(args, problem_info) != 0) 
         {
-            fprintf(stderr, "Error: get task info error from file %s.\n", args.tasks_def.c_str());
+            fprintf(stderr, "Error: get task %d info error from file %s.\n", problem_info.task_id);
             return -1;
         }
 		if (problem_info.problem_def == "Arm")
         {
-            unique_ptr<Evaluator> eval_func(new ArmEvaluator());
-            eval_func->Initialize(problem_info);
+            unique_ptr<Evaluator> eval_func(new ArmEvaluator(problem_info));
             manytask_funs.push_back(std::move(eval_func));
         }else {
-            unique_ptr<Evaluator> eval_func(new BenchFuncEvaluator());
-            eval_func->Initialize(problem_info);
+            unique_ptr<Evaluator> eval_func(new BenchFuncEvaluator(problem_info));
             manytask_funs.push_back(std::move(eval_func));
         }
 		
-		island_info.results_dir = args.results_dir;
-        island_info.island_ID = i;
-        island_info.results_subdir = args.results_subdir;
-
-        Record record = Record(node_info);
+        Record record = Record(args, args.total_tasks[i]);
         record_tasks.push_back(record);
 
         island_infos.push_back(island_info);
@@ -172,22 +158,11 @@ int eval_init(int argc, char* argv[])
     return 0;
 }
 
-int eval_deinit()
-{
-    for(int i = 0; i < total_task_num; i++)
-    {
-        manytask_funs[i]->Uninitialize();
-    }
-	if (GA){
-		ga_cpu.Uninitialize();
-	}
 
-    return 0;
-}
 
 double eval_manytask(double y[], int task_id)
 {
-	vector<real> elements(y, y + MAX_NVARS);
+	vector<Real> elements(y, y + MAX_NVARS);
 	double s = manytask_funs[task_id]->EvaluateFitness(elements);
 	fbest[task_id] = min(fbest[task_id], s);
 	return s;
@@ -540,7 +515,6 @@ void initialized()
 
 	for (int i = 0; i < total_task_num; i++){
 		NVARS_t[i] = MAX_NVARS;
-		record_tasks[i].Initialize(island_infos[i], problem_infos[i], ea_infos[i]);
 		Eigen::MatrixXd mat(MAX_NVARS, MAX_NVARS);
 		Cov_eigen.push_back(mat);
 		Inv_Cov_eigen.push_back(mat);
@@ -607,7 +581,7 @@ void MaTDE()
 		}
 
 		//Print the current best
-		if ((generation + 1) % record_tasks[0].RECORD_INTERVAL == 0
+		if ((generation + 1) % args.record_interval == 0
              || (generation == 0))
 		{
 			for (i = 0; i < task_num; i++){
@@ -615,8 +589,6 @@ void MaTDE()
 					info.best_fitness = fbest[i];
 					info.generation = generation+1;
 					// info.elements = ind.elements;
-					info.comm_time = 0;
-					info.time = 0;
 					record_tasks[i].RecordInfos(info);
 					
 					printf("run:%d\n", job);
@@ -631,8 +603,8 @@ void MaTDE()
 	cerr << "start uninitialize " << endl;
 	for (i = 0; i < task_num; i++)
 	{
-		record_tasks[i].FlushInfos();
-		record_tasks[i].Uninitialize();
+		record_tasks[i].FlushInfos(job);
+		record_tasks[i].Clear();
 	}
 	cerr << "finish one run " << endl;	
 
@@ -659,7 +631,6 @@ int main(int argc, char* argv[])
 	}
 	cout << "total time cost: " << (double)(clock() - start) / CLOCKS_PER_SEC << " s for " << RUNS << " runs" << endl;
 	// final_report();
-    eval_deinit();
 	return 0;
 }
 

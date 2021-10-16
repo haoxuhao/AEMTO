@@ -1,338 +1,216 @@
 #ifndef __H_SET_PARAMS_H__
 #define __H_SET_PARAMS_H__
 
+#include <string>
 #include "config.h"
 #include "util.h"
 #include "EA.h"
-#include "SimpleIni.h"
 
-struct Args
-{
-    vector<int> total_tasks;
-    int total_runs;
-    int nodes;
-    int gpus_per_node;
-    uint gpu_id;
-    string tasks_def;
-    bool use_unified_space;
-    bool debug;
-    string params_file;
-    string log_dir;
-    string results_dir;
-    string results_subdir;
-    int kn_provid_thread_num;
-    int cwu_thread; 
+
+///https://stackoverflow.com/questions/865668/parsing-command-line-arguments-in-c
+class CmdParser{
+    public:
+        CmdParser (int &argc, char **argv){
+            for (int i=1; i < argc; ++i)
+                this->tokens.push_back(std::string(argv[i]));
+        }
+        /// @author iain
+        const std::string getCmdOption(const std::string &option) const{
+            std::vector<std::string>::const_iterator itr;
+            itr =  std::find(this->tokens.begin(), this->tokens.end(), option);
+            if (itr != this->tokens.end() && ++itr != this->tokens.end()){
+                return *itr;
+            }
+            static const std::string empty_string("");
+            return empty_string;
+        }
+        string getCmdOption(const std::string &opt, string default_value) {
+            string ret = getCmdOption(opt);
+            if (ret == "") return default_value;
+            return ret;
+        }
+        int getCmdOption(const std::string &opt, int default_value) {
+            string ret = getCmdOption(opt);
+            if (ret == "") return default_value;
+            return stoi(ret);
+        }
+        double getCmdOption(const std::string &opt, double default_value) {
+            string ret = getCmdOption(opt);
+            if (ret == "") return default_value;
+            return stod(ret);
+        }
+        /// @author iain
+        bool cmdOptionExists(const std::string &option) const{
+            return std::find(this->tokens.begin(), this->tokens.end(), option)
+                   != this->tokens.end();
+        }
+    private:
+        std::vector <std::string> tokens;
 };
 
-
-char* getParam(const char * needle, char* haystack[], int count)
-{
-    int i = 0;
-    for (i = 0; i < count; i++) {
-        if (strcmp(needle, haystack[i]) == 0) {
-            if (i < count - 1) {
-                return haystack[i + 1];
-            }
-        }
-    }
-    return 0;
-}
-
 int SetParameters(IslandInfo &island_info, ProblemInfo &problem_info, \
-    NodeInfo &node_info, EAInfo &EA_info, Args &args, int argc, char** argv)
+    EAInfo &EA_info, Args &args, int argc, char** argv)
 {
-    char *p = NULL;
-    p = getParam("-debug", argv, argc);
-    args.debug = p ? true : false;
-
-    p = getParam("-log_dir", argv, argc);
-    args.log_dir = p? p : "tmp/emto_log";
-
-    p = getParam("-results_dir", argv, argc);
-    args.results_dir = p ? p : "Results/"+time_now();
-
-    p = getParam("-results_subdir", argv, argc);
-    args.results_subdir = p ? p : "details";
-
-    p = getParam("-knp_thread_num", argv, argc);
-    args.kn_provid_thread_num = p ? atoi(p) : 1;
-    
-    p = getParam("-cwu_thread", argv, argc);
-    args.cwu_thread = p ? atoi(p) : 1;
-
-    if (getParam("-total_tasks", argv, argc))
-    {
-        string str = getParam("-total_tasks", argv, argc);
-        if(str.find("-") != str.npos)
-        {
-            vector<string> tmp;
-            split(str, '-', tmp);
-            
-            for(int i=atoi(tmp[0].c_str()); i < atoi(tmp[1].c_str())+1; i++)
-            {
-                args.total_tasks.push_back(i);
-            }
-        }
-        else if (str.find(",")!=str.npos)
-        {
-            vector<string> tmp;
-            split(str, ',', tmp);
-            for(int i = 0; i < tmp.size(); i++)
-            {
-                const char *tmp_function1 = tmp[i].c_str();
-                args.total_tasks.push_back(atoi(tmp_function1));
-            }
-        }
-        else{
-            fprintf(stderr, "Error: get tasks error, invalid arguments: %s\n", str.c_str());
-            return -1;
+    CmdParser cmd_parser(argc, argv);
+    args.results_dir = cmd_parser.getCmdOption("-results_dir", "Results/" + time_now());
+    args.results_subdir = cmd_parser.getCmdOption("-results_subdir", "details/");
+    args.problem_set = cmd_parser.getCmdOption("-problem_set", "Arm");
+    args.problem_name = cmd_parser.getCmdOption("-problem_name", "1");
+    args.UDim = cmd_parser.getCmdOption("-UDim", 50);
+    args.popsize = cmd_parser.getCmdOption("-popsize", 100);
+    args.record_interval = cmd_parser.getCmdOption("-record_interval", 100);
+    args.total_runs = cmd_parser.getCmdOption("-total_runs", 10);
+    args.G_max = cmd_parser.getCmdOption("-Gmax", 100);
+    args.MTO = !cmd_parser.cmdOptionExists("--STO");
+    string total_tasks_str = cmd_parser.getCmdOption("-total_tasks", "1-10");
+    if(total_tasks_str.find("-") != total_tasks_str.npos) {
+        vector<string> tmp = split(total_tasks_str, '-');
+        for(int i = stoi(tmp[0]); i < stoi(tmp[1]) + 1; i++) {
+            args.total_tasks.push_back(i);
         }
     }
-
-    p = getParam("-params_file", argv, argc);
-    if (p)
-    {
-        args.params_file = p;
-    }else{
-        fprintf(stderr, "Error: get pamrams file error\n");
-        return -1;
+    else if (total_tasks_str.find(",") != total_tasks_str.npos) {
+        vector<string> tmp = split(total_tasks_str, ',');
+        for(int i = 0; i < tmp.size(); i++) {
+            args.total_tasks.push_back(stoi(tmp[i]));
+        }
+    }
+    else {
+        fprintf(stderr, "Error: invalid total tasks define: %s\n", total_tasks_str.c_str());
+        abort();
     }
     
-    p = getParam("-tasks_def", argv, argc);
-    if (p)
-    {
-        args.tasks_def = p;
-    }else{
-        fprintf(stderr, "Error: get tasks define file error\n");
-        return -1;
-    }
-    
-    p = getParam("-total_runs", argv, argc);
-    args.total_runs = p ? atoi(p) : 1;
-    p = getParam("-max_base_FEs", argv, argc);
-    problem_info.max_base_FEs = p ? atoi(p) : 2000;
-    p = getParam("-computing_time", argv, argc);
-    problem_info.computing_time =  p ? atoi(p) : 500;
+    EA_info.CR = 0.9;
+    EA_info.F = 0.5;
+    EA_info.UKTCR = 0.9;
+    EA_info.LKTCR = 0.1;
+    EA_info.STO = "DE";
+    EA_info.ga_param.mu =  15;
+    EA_info.ga_param.mum = 15;
+    EA_info.ga_param.probswap = 0.5;
 
-    p = getParam("-nodes", argv, argc);
-    args.nodes = p ? atoi(p) : 1;
-    p = getParam("-gpus_per_node", argv, argc);
-    args.gpus_per_node = p ? atoi(p) : 1;
-    p = getParam("-gpu_id", argv, argc);
-    args.gpu_id = p ? atoi(p) : 0;
+    island_info.island_size = args.popsize; /// TODO remove latter!
 
-    p = getParam("-island_size", argv, argc);
-    island_info.island_size = p ? atoi(p) : 100;
-    p = getParam("-interval", argv, argc);
-    island_info.interval = p ? atoi(p) : 10;
-    p = getParam("-connection_rate", argv, argc);
-    island_info.connection_rate = p ? atof(p) : 1;
-    p = getParam("-export_rate", argv, argc);
-    island_info.export_rate = p ? atof(p) : 0.01;
-    p = getParam("-import_rate", argv, argc);
-    island_info.import_rate = p ? atof(p) : 1;
-    p = getParam("-buffer_manage", argv, argc);
-    island_info.buffer_manage = p ? p : "random"; 
-    p = getParam("-buffer_capacity", argv, argc);
-    island_info.buffer_capacity = p ? atof(p) : 1;
- 
-    /* read common parameters from cfg file*/
-    CSimpleIni MaTEA_cfgs;
-    MaTEA_cfgs.LoadFile(args.params_file.c_str());
-    
-    EA_info.CR = MaTEA_cfgs.GetDoubleValue("DE", "CR", 0.8);
-    EA_info.F = MaTEA_cfgs.GetDoubleValue("DE", "F", 0.5);
-    EA_info.strategy_ID = MaTEA_cfgs.GetLongValue("DE", "strategy", 4);
-    EA_info.LCR = MaTEA_cfgs.GetDoubleValue("DE", "LCR", 0.1);
-    EA_info.UCR = MaTEA_cfgs.GetDoubleValue("DE", "UCR", 0.9);
-    EA_info.UF = MaTEA_cfgs.GetDoubleValue("DE", "UF", 2);
-    EA_info.LF = MaTEA_cfgs.GetDoubleValue("DE", "LF", 0.1);
-    
-    problem_info.dim = MaTEA_cfgs.GetLongValue("MaTDE", "U_DIM", 50);
-    EA_info.ktc_cr = MaTEA_cfgs.GetDoubleValue("MaTDE", "ktc_cr", 1.0);
-    EA_info.transfer_cross_over_rate = MaTEA_cfgs.GetDoubleValue("MaTDE", "transfer_cross_over_rate", 1);
-    args.use_unified_space = MaTEA_cfgs.GetBoolValue("MaTDE", "use_unified_search_space", false);
-    EA_info.UKTCR = MaTEA_cfgs.GetDoubleValue("MaTDE", "UKTCR", 0.9);
-    EA_info.LKTCR = MaTEA_cfgs.GetDoubleValue("MaTDE", "LKTCR", 0.1);
-    
-    if(args.use_unified_space)
-    {
-        problem_info.max_bound = MaTEA_cfgs.GetDoubleValue("MaTDE", "U_UP_BOUND", 1);
-        problem_info.min_bound = MaTEA_cfgs.GetDoubleValue("MaTDE", "U_LOW_BOUND", 0);
-    }else{
-        fprintf(stderr, "use original search space. \n");
-    }
+    cout << "===========================\n"
+         << "Cmd Params: \n"
+         << "problem set " << args.problem_set << "\n" 
+         << "problem name " << args.problem_name << "\n"
+         << "total tasks " << total_tasks_str << "\n"
+         << "unified search space dims " << args.UDim << "\n"
+         << "total runs " << args.total_runs << "\n"
+         << "pop size " << args.popsize << "\n"
+         << "Gmax " << args.popsize << "\n"
+         << "record interval " << args.record_interval << "\n"
+         << "results dir " << args.results_dir << "\n"
+         << "results sub dir " << args.results_subdir << "\n"
+         << "===========================" << endl;
 
-    string kttype = MaTEA_cfgs.GetValue("KT", "KTType", "UNI_CROSSOVER");
-    if(kttype == "UNI_CROSSOVER"){
-        island_info.transfer_type = UNI_CROSSOVER;
-    }
-    else if(kttype == "INSERT")
-    {
-        island_info.transfer_type = INSERT;
-    }
-    else if(kttype == "DE_BASE_VEC")
-    {
-        island_info.transfer_type = DE_BASE_VEC;
-    }else{
-        fprintf(stderr, "Invalid knowledge transfer type given %s. \n", kttype.c_str());
-        return -1;
-    }
-    
-    island_info.ada_param.alpha = MaTEA_cfgs.GetDoubleValue("AdaParam", "alpha", 0.5);
-    island_info.ada_param.beta = MaTEA_cfgs.GetDoubleValue("AdaParam", "beta", 0.2);
-    island_info.ada_param.Delta_T = MaTEA_cfgs.GetDoubleValue("AdaParam", "Delta_T", 100000);
-    island_info.ada_param.Delta_T = MaTEA_cfgs.GetDoubleValue("AdaParam", "Delta_T", 100000);
-    island_info.ada_param.pbase = MaTEA_cfgs.GetDoubleValue("AdaParam", "pbase", 0.5);
-    island_info.ada_param.sample_batch = MaTEA_cfgs.GetLongValue("AdaParam", "sample_batch", 1000000);
-
-    island_info.pmto_param.sync_gen = MaTEA_cfgs.GetBoolValue("ParallelParam", "sync_gen", false); 
-    island_info.pmto_param.wait_pop = MaTEA_cfgs.GetBoolValue("ParallelParam", "wait_pop", false); 
-    island_info.pmto_param.use_buffer = MaTEA_cfgs.GetBoolValue("ParallelParam", "use_buffer", false); 
-    island_info.pmto_param.sync_gens = MaTEA_cfgs.GetLongValue("ParallelParam", "sync_gens", 100);
-    island_info.pmto_param.cuda_EA_delta = MaTEA_cfgs.GetLongValue("ParallelParam", "cuda_EA_delta", 50);
-     
-    island_info.import_strategy = MaTEA_cfgs.GetValue("KT", "import_strategy", "Epsilon_ADA");
-    island_info.ada_import_prob = MaTEA_cfgs.GetLongValue("KT", "ada_import_prob", 1);
-    island_info.upper_import_prob = MaTEA_cfgs.GetDoubleValue("KT", "upper_import_prob", 0.9);
-    island_info.lower_import_prob = MaTEA_cfgs.GetDoubleValue("KT", "lower_import_prob", 0.1);
-    island_info.select_num = MaTEA_cfgs.GetLongValue("KT", "select_num", args.total_tasks.size() - 1);
-    island_info.ada_import_epsilon = MaTEA_cfgs.GetDoubleValue("KT", "ada_import_epsilon", 0.0);
-    island_info.export_strategy = MaTEA_cfgs.GetValue("KT", "export_strategy", "EDT");
-    island_info.reward_self = MaTEA_cfgs.GetDoubleValue("KT", "reward_self", 1.0);
-    island_info.ada_import_strategy = MaTEA_cfgs.GetValue("KT", "ada_import_strategy", "Matching");
-
-    island_info.emmigration_strategy = MaTEA_cfgs.GetValue("KT", "emmigration_strategy", "best");
-    island_info.buffer_sampling = MaTEA_cfgs.GetValue("global", "buffer_sampling", "best");
-    island_info.buffer_manage = MaTEA_cfgs.GetValue("global", "buffer_manage", "first");
-
-    island_info.import_interval = MaTEA_cfgs.GetDoubleValue("KT", "import_interval", 10);
-    island_info.import_prob = MaTEA_cfgs.GetDoubleValue("KT", "import_prob", 0.1);
-    island_info.export_interval = MaTEA_cfgs.GetDoubleValue("KT", "export_interval", 10);
-    island_info.export_prob = MaTEA_cfgs.GetDoubleValue("KT", "export_prob", 1.0);
-    island_info.import_rate = MaTEA_cfgs.GetDoubleValue("KT", "import_rate", 0.2);
-    island_info.export_rate = MaTEA_cfgs.GetDoubleValue("KT", "export_rate", 1.0);
-    island_info.buffer_capacity = MaTEA_cfgs.GetDoubleValue("KT", "buffer_capacity", 1);
-    island_info.island_size = MaTEA_cfgs.GetLongValue("global", "population", 100);
-    island_info.run_param.FEs = MaTEA_cfgs.GetLongValue("global", "FEs", 100000);
-    problem_info.max_base_FEs = MaTEA_cfgs.GetLongValue("global", "base_FEs", 2000);
-    problem_info.computing_time = MaTEA_cfgs.GetLongValue("global", "computing_time", 1000);
-    args.total_runs = MaTEA_cfgs.GetLongValue("global", "total_runs", 1);
-    island_info.print_interval = MaTEA_cfgs.GetLongValue("global", "print_interval", 50); 
-    island_info.record_details = MaTEA_cfgs.GetBoolValue("global", "record_details", 0);
-
-    EA_info.group_size = island_info.island_size;
-    EA_info.group_num = island_info.island_size / EA_info.group_size;
-    EA_info.STO = MaTEA_cfgs.GetValue("EA", "STO", "DE");
-    EA_info.ktcr_strategy = MaTEA_cfgs.GetValue("EA", "ktcr_strategy", "UNI");
-    if(EA_info.STO == "GA")
-    {
-        EA_info.ga_param.mu = MaTEA_cfgs.GetDoubleValue("GA", "mu", 20);
-        EA_info.ga_param.mum = MaTEA_cfgs.GetDoubleValue("GA", "mum", 15);
-        EA_info.ga_param.probswap = MaTEA_cfgs.GetDoubleValue("GA", "probswap", 0.5);
-        printf("set ga param mu %.2f mum %.2f probswap %.2f\n", EA_info.ga_param.mu, EA_info.ga_param.mum, EA_info.ga_param.probswap);
-    }
     return 0;
-
 }
 
-int GetProblemInfo(CSimpleIni &cfgs, ProblemInfo &base_info, bool use_unified)
+int GetProblemInfo(const Args &args, ProblemInfo &base_info)
 {
-    //load global problem data
-    string problem_def = cfgs.GetValue("global", "problem_def", "MaTDE10SOTasks");
-    string bin_root = cfgs.GetValue("global", "bin_root", "/fred/oz121/hxu/AEMTO/bin/");
     int task_id = base_info.task_id;
-    base_info.problem_def = problem_def;
-    base_info.bin_root = bin_root;
-    if(problem_def == "MaTDE10SOTasks")
+    base_info.problem_def = args.problem_set;
+    base_info.dim = args.UDim;
+    base_info.min_bound = 0;
+    base_info.max_bound = 1;
+    string data_root = "./data";
+    
+    if(args.problem_set == "matde_problem")
     {
-        string data_dir = bin_root + string(cfgs.GetValue("global", "shift_data_dir", "null"));
-        base_info.shift_data_root = data_dir;
-       
-        base_info.shift_data_prefix = cfgs.GetValue("global", "shift_data_file_prefix", "null");
-        
-        base_info.rotation_data_root = (bin_root + string(cfgs.GetValue("global", "rotation_data_dir", "null")));
-        base_info.rotation_data_prefix = cfgs.GetValue("global", "rotation_data_file_prefix", "null");
-
+        base_info.shift_data_file = data_root + "/matde_problem/shift_task" 
+            + to_string(task_id) + ".txt";
+        static vector<string> func_names = {
+            "sphere", "sphere", "sphere", "weierstrass",
+             "rosenbrock", "ackley", "weierstrass", "schwefel", 
+             "griewank", "rastrigin"
+        };
+        static vector<int> calc_dims {50, 50, 50, 25, 50, 50, 50, 50, 50, 50};
         base_info.task_id = task_id;
-        string task_name = "task" + std::to_string(task_id);
-        base_info.o_max_bound = cfgs.GetDoubleValue(task_name.c_str(), "max_bound", 100);
-        base_info.o_min_bound = cfgs.GetDoubleValue(task_name.c_str(), "min_bound", -100);
-        base_info.calc_dim    = (int)cfgs.GetLongValue(task_name.c_str(), "dim", 50);
-        base_info.func_id     = (int)cfgs.GetLongValue(task_name.c_str(), "function_id", 0);
-        if(!use_unified)
-        {
-            base_info.max_bound = base_info.o_max_bound;
-            base_info.min_bound = base_info.o_min_bound;
-        }
+        base_info.calc_dim = calc_dims[task_id - 1];
+        base_info.benchfunc_name = func_names[task_id - 1];
     }
-    else if(problem_def == "CEC50SOTasks")
+    else if(args.problem_set == "manytask10")
     {
+        string shift_tag = args.problem_name;
+        base_info.shift_data_file = data_root + "/manytask10/" + 
+            shift_tag + "/shift_task" + to_string(task_id) + ".txt";
+        static vector<string> func_names = {
+            "rosenbrock", "ackley", "schwefel", "griewank",
+             "rastrigin", "rosenbrock", "ackley", "schwefel", 
+             "griewank", "rastrigin"
+        };
+        static vector<int> calc_dims {50, 50, 50, 50, 50, 50, 50, 50, 50, 50};
         base_info.task_id = task_id;
-        int problem_id = cfgs.GetLongValue("global", "problem_id", 1);
-        string problem_info_section = "problem"+std::to_string(problem_id);
-        base_info.calc_dim = base_info.dim;
-        base_info.o_max_bound = cfgs.GetDoubleValue(problem_info_section.c_str(), "max_bound", 100);
-        base_info.o_min_bound = cfgs.GetDoubleValue(problem_info_section.c_str(), "min_bound", -100);
-        base_info.func_id = (int)cfgs.GetLongValue(problem_info_section.c_str(), "function_id", 0);
-
-        base_info.shift_data_root = (bin_root + cfgs.GetValue(problem_info_section.c_str(), "shift_data_dir", "null"));
-        base_info.rotation_data_root = (bin_root + cfgs.GetValue(problem_info_section.c_str(), "rotation_data_dir", "null"));
-
-        base_info.shift_data_prefix =  cfgs.GetValue(problem_info_section.c_str(), "shift_data_file_prefix", "null");
-        base_info.rotation_data_prefix = cfgs.GetValue(problem_info_section.c_str(), "rotation_data_file_prefix", "null");
-
-        if(!use_unified)
-        {
-            base_info.max_bound = base_info.o_max_bound;
-            base_info.min_bound = base_info.o_min_bound;
-        }
+        base_info.calc_dim = calc_dims[task_id - 1];
+        base_info.benchfunc_name = func_names[task_id - 1];
     }
-    else if (problem_def == "ManMany")
+    else if(args.problem_set == "cec50")
     {
         base_info.task_id = task_id;
-        int task_index = task_id - 1;
-        base_info.dim = cfgs.GetLongValue("global", "dim", 10); 
-        base_info.calc_dim = base_info.dim;
-        int base_funcs = cfgs.GetLongValue("global", "basefuncs", 5);
-        string func_id_str = ("func_id" + to_string(task_index % base_funcs));
-        base_info.func_id = cfgs.GetLongValue("funcs", func_id_str.c_str(), 0);
-        vector<string> range = split(cfgs.GetValue("ranges", func_id_str.c_str(), "-50,50"), ',');
-
-        base_info.o_max_bound = std::stof(range[1]);
-        base_info.o_min_bound = std::stof(range[0]); 
-        
-        base_info.shift_data_root = (bin_root + cfgs.GetValue("global", "shift_data_dir", "null"));
-        base_info.rotation_data_root = (bin_root + cfgs.GetValue("global", "rotation_data_dir", "null"));
-
-        base_info.shift_data_prefix =  cfgs.GetValue("global", "shift_data_file_prefix", "null");
-        base_info.rotation_data_prefix = cfgs.GetValue("global", "rotation_data_file_prefix", "null");
-
-        if(!use_unified)
-        {
-            base_info.max_bound = base_info.o_max_bound;
-            base_info.min_bound = base_info.o_min_bound;
-        }
+        int problem_id = stoi(args.problem_name);
+        static vector<string> func_names = {
+            "rosenbrock", "ackley", "rastrigin", 
+            "griewank", "weierstrass", "schwefel"
+        };
+        base_info.benchfunc_name = func_names[problem_id - 1];
+        base_info.calc_dim = 50;
+        base_info.shift_data_file = data_root
+            + "/CEC50/problem" + to_string(problem_id) 
+            + "/shift_" + to_string(task_id) + ".txt";
+        base_info.rotation_data_file = data_root
+            + "/CEC50/problem" + to_string(problem_id) 
+            + "/rotation_" + to_string(task_id) + ".txt";
     }
-    else if(problem_def == "Arm")
+    else if(args.problem_set == "mto_benchmark")
     {
-        base_info.o_max_bound = cfgs.GetDoubleValue("range", "max", 1);
-        base_info.o_min_bound = cfgs.GetDoubleValue("range", "min", 0);
-        base_info.max_bound = base_info.o_max_bound;
-        base_info.min_bound = base_info.o_min_bound; 
-        base_info.dim = cfgs.GetLongValue("global", "dim", 10); 
+        assert(task_id <= 2 && "only two component tasks in this problem set");
+        base_info.task_id = task_id;
+        int problem_id = stoi(args.problem_name);
+        const string problem_name = "problem" + to_string(problem_id);
+        static unordered_map<string, vector<string>> problem_func_infos {
+            {"problem1", {"griewank", "rastrigin"}},
+            {"problem2", {"ackley", "rastrigin"}},
+            {"problem3", {"ackley", "schwefel"}},
+            {"problem4", {"rastrigin", "sphere"}},
+            {"problem5", {"ackley", "rosenbrock"}},
+            {"problem6", {"ackley", "weierstrass"}},
+            {"problem7", {"rosenbrock", "rastrigin"}},
+            {"problem8", {"griewank", "weierstrass"}},
+            {"problem9", {"rastrigin", "schwefel"}}
+        };
+        static unordered_map<string, vector<int>> problem_dim_infos {
+            {"problem1", {50, 50}},
+            {"problem2", {50, 50}},
+            {"problem3", {50, 50}},
+            {"problem4", {50, 50}},
+            {"problem5", {50, 50}},
+            {"problem6", {50, 25}},
+            {"problem7", {50, 50}},
+            {"problem8", {50, 50}},
+            {"problem9", {50, 50}},
+        };
+        base_info.benchfunc_name = problem_func_infos[problem_name][task_id - 1];
+        base_info.calc_dim = problem_dim_infos[problem_name][task_id - 1];
+        base_info.shift_data_file = data_root + "/mto_benchmark/" 
+            + problem_name + "/shift_" + to_string(task_id) + ".txt";
+        base_info.rotation_data_file = data_root + "/mto_benchmark/" 
+            + problem_name + "/rotation_" + to_string(task_id) + ".txt";
+    }
+    else if(args.problem_set == "Arm")
+    {
+        base_info.dim = 50; 
         base_info.calc_dim = base_info.dim;
-        base_info.shift_data_root = (bin_root + cfgs.GetValue("global", "shift_data_dir", "null"));
-        base_info.shift_data_prefix = cfgs.GetValue("global", "shift_data_file_prefix", "null");
+        base_info.arm_data_file = data_root + "/Arm/centroids_2000_2.dat";
     }
     else
     {
-        fprintf(stderr, "Error: invalid problem definition or the given problem is not implemented yet. \n");
+        fprintf(stderr, "Error: invalid problem definition or"
+                        " the given problem is not implemented yet. \n");
         return -1;
     }
     return 0;
 }
 
-
 #endif
-

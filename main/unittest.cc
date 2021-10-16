@@ -1,5 +1,6 @@
 #include <iostream>
 #include <algorithm>
+#include <unordered_map>
 #include "config.h"
 #include "random.h"
 #include "util.h"
@@ -11,14 +12,13 @@ using namespace std;
 
 void arm_eval_test()
 {
-    ArmEvaluator arm;
     ProblemInfo problem_info;
-    problem_info.shift_data_root = "/fred/oz121/hxu/2020_mouret_gecco/src";
+    ArmEvaluator arm(problem_info);
+    problem_info.shift_data_file = "/fred/oz121/hxu/2020_mouret_gecco/src";
     problem_info.dim = 10;
     problem_info.task_id = 1;
-    arm.Initialize(problem_info);
-    vector<real> elems = {0.884907, 0.344362, 0.244923, 0.0370074, 0.920197, 0.420731, 0.540009, 0.818535, 0.874266, 0.299411};
-    real fitness = arm.EvaluateFitness(elems);
+    vector<Real> elems = {0.884907, 0.344362, 0.244923, 0.0370074, 0.920197, 0.420731, 0.540009, 0.818535, 0.874266, 0.299411};
+    Real fitness = arm.EvaluateFitness(elems);
     printf("fitness %f\n", fitness);
 }
 
@@ -51,7 +51,7 @@ int main()
     /*roulette_sampling test*/
     // Random random_;
     // //c++11
-    // vector<real> pdf = {0.18, 0.16, 0.15, 0.13, 0.11, 0.09, 0.07, 0.06, 0.03, 0.02, 0.0};
+    // vector<Real> pdf = {0.18, 0.16, 0.15, 0.13, 0.11, 0.09, 0.07, 0.06, 0.03, 0.02, 0.0};
     // cout << "pdf: ";
     // for(auto e : pdf)
     // {
@@ -69,7 +69,7 @@ int main()
     // assert(median({1, 2, 3}) == 2 && "median test error");
 
     // /* variable vector */
-    // vector<vector<real> > mem;
+    // vector<vector<Real> > mem;
     // mem.push_back({1,2,3});
     // mem.push_back({4,5});
     // for(auto e : mem)
@@ -82,7 +82,7 @@ int main()
     // }
 
     // /*roulette sample fitnesses*/
-    // vector<real> fitnesses = {0.18, 0.16, 0.15, 0.13, 0.11, 0.09, 0.07, 0.06, 0.03, 0.02, 0.1};
+    // vector<Real> fitnesses = {0.18, 0.16, 0.15, 0.13, 0.11, 0.09, 0.07, 0.06, 0.03, 0.02, 0.1};
     // cout << "fitnesses: ";
     // for(auto e : fitnesses)
     // {
@@ -100,10 +100,10 @@ int main()
     // arm_eval_test();
 
     // sus sample test
-    // vector<real> pdf = {0.18, 0.16, 0.15, 0.13, 0.11, 0.09, 0.13, 0.05};
-    vector<real> pdf = {0.18, 0.16, 0.15, 0.13, 0.11, 0.09, 0.07, 0.06, 0.03, 0.02, 0.1};
-    real pdf_sum = accumulate(pdf.begin(), pdf.end(), 0.0);
-    std::for_each(pdf.begin(), pdf.end(), [&](real &x) {x /= pdf_sum;});
+    // vector<Real> pdf = {0.18, 0.16, 0.15, 0.13, 0.11, 0.09, 0.13, 0.05};
+    vector<Real> pdf = {0.18, 0.16, 0.15, 0.13, 0.11, 0.09, 0.07, 0.06, 0.03, 0.02, 0.1};
+    Real pdf_sum = accumulate(pdf.begin(), pdf.end(), 0.0);
+    std::for_each(pdf.begin(), pdf.end(), [&](Real &x) {x /= pdf_sum;});
     int sele_num = 20;
     Random rand_;
     vector<int> sel_indices = rand_.sus_sample(pdf, sele_num);

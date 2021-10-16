@@ -34,11 +34,7 @@ int EA::InitializePopulation(Population &pop, unique_ptr<Evaluator> &eval)
     return 0; 
 }
 
-int EA::Uninitialize()
-{
-    return 0;
-}
-real EA::CheckBound(real to_check_elements, real min_bound, real max_bound)
+Real EA::CheckBound(Real to_check_elements, Real min_bound, Real max_bound)
 {
 	while ((to_check_elements < min_bound) || (to_check_elements > max_bound))
 	{
@@ -106,23 +102,23 @@ Population EA::Survival(Population &pop, Population &offsp, EvolveRewards &out)
     return pop;
 }
 
-real EA::PopImprovement(Population &pop_curr, Population &pop_pre)
+Real EA::PopImprovement(Population &pop_curr, Population &pop_pre)
 {
     SortPop(pop_curr);
     SortPop(pop_pre);
-    real res = 0;
+    Real res = 0;
     int pop_size = (int)pop_curr.size();
-    real delta = pop_curr[0].fitness_value;
+    Real delta = pop_curr[0].fitness_value;
     for (int i = 0; i < pop_size; i++)
     {
         res += delta / pop_curr[i].fitness_value * \
             (pop_pre[i].fitness_value - pop_curr[i].fitness_value);
     }
-    res /= (real) pop_size;
+    res /= (Real) pop_size;
     res /= delta;
     return res;
 }
-real check_bnd(real x, real lb, real ub)
+Real check_bnd(Real x, Real lb, Real ub)
 {
     while ((x < lb) || (x > ub))
 	{
@@ -135,7 +131,7 @@ real check_bnd(real x, real lb, real ub)
 	return x;
 }
 
-Individual binomial_crossover(const Individual &p1, const Individual &p2, real cr)
+Individual binomial_crossover(const Individual &p1, const Individual &p2, Real cr)
 {
     assert(p1.elements.size() == p2.elements.size() &&
            "same dimension of p1 and p2 required.");
@@ -156,12 +152,12 @@ Individual binomial_crossover(const Individual &p1, const Individual &p2, real c
 /*
     SBX
 */
-vector<real> GA_CPU::crossover(const vector<real> &p1,
-                               const vector<real> &p2,
-                               const vector<real> &cf)
+vector<Real> GA_CPU::crossover(const vector<Real> &p1,
+                               const vector<Real> &p2,
+                               const vector<Real> &cf)
 {
     int dim = p1.size();
-    vector<real> ret;
+    vector<Real> ret;
     ret.resize(dim, 0.0);
     for (int i = 0; i < dim; i++)
     {
@@ -171,7 +167,7 @@ vector<real> GA_CPU::crossover(const vector<real> &p1,
     }
     return ret; 
 }
-Individual GA_CPU::crossover(const Individual &p1, const Individual &p2, const vector<real> &cf)
+Individual GA_CPU::crossover(const Individual &p1, const Individual &p2, const vector<Real> &cf)
 {
     Individual ret;
     ret.elements = crossover(p1.elements, p2.elements, cf); 
@@ -181,23 +177,23 @@ Individual GA_CPU::crossover(const Individual &p1, const Individual &p2, const v
 /*
     polynomial mutation
 */
-vector<real> GA_CPU::mutate(vector<real> &p)
+vector<Real> GA_CPU::mutate(vector<Real> &p)
 {
-    real mum = EA_info_.ga_param.mum;
+    Real mum = EA_info_.ga_param.mum;
     int dim = (int)p.size();
     for (int i = 0; i < dim; i++)
     {
         if(random_.RandRealUnif(0, 1) < (1.0 / dim))
         {
-            real u = random_.RandRealUnif(0, 1);
+            Real u = random_.RandRealUnif(0, 1);
             if (u <= 0.5)
             {
-                real d = pow((2 * u), 1.0 / (1.0 + mum)) - 1;
+                Real d = pow((2 * u), 1.0 / (1.0 + mum)) - 1;
                 p[i] = p[i] + d * p[i];
             }
             else
             {
-                real d = 1 - pow((2 * (1 - u)), 1.0 / (1.0 + mum));
+                Real d = 1 - pow((2 * (1 - u)), 1.0 / (1.0 + mum));
                 p[i] = p[i] + d * (1.0 - p[i]); 
             }
         }
@@ -213,13 +209,13 @@ Individual GA_CPU::mutate(Individual &p)
 /**
  *  params prepare
  */
-vector<real> GA_CPU::generate_cf(int dim)
+vector<Real> GA_CPU::generate_cf(int dim)
 {
-    vector<real> cf(dim, 0.0);
-    real mu = EA_info_.ga_param.mu;
+    vector<Real> cf(dim, 0.0);
+    Real mu = EA_info_.ga_param.mu;
     for (int k = 0; k < dim; k++)
     {
-        real u = random_.RandRealUnif(0, 1);
+        Real u = random_.RandRealUnif(0, 1);
         if(u <= 0.5)
         {
             cf[k] = pow(2 * u, (1.0 / (mu + 1)));
@@ -232,15 +228,15 @@ vector<real> GA_CPU::generate_cf(int dim)
     return cf;
 }
 
-int GA_CPU::swap(vector<real> &c1, vector<real> &c2)
+int GA_CPU::swap(vector<Real> &c1, vector<Real> &c2)
 {
-    real probswap = EA_info_.ga_param.probswap;
+    Real probswap = EA_info_.ga_param.probswap;
     int dim = c1.size();
     for(int k = 0; k < dim; k++)
     {
         if (random_.RandRealUnif(0, 1) >= probswap)
         {
-            real tmp = c2[k];
+            Real tmp = c2[k];
             c2[k] = c1[k];
             c1[k] = tmp;
         }
@@ -250,7 +246,7 @@ Population GA_CPU::Variation(Population &pop)
 {
     int pop_size = (int)pop.size();
     int dim = (int)pop[0].elements.size();
-    real probswap = EA_info_.ga_param.probswap;
+    Real probswap = EA_info_.ga_param.probswap;
     Population offsp;
     vector<int> rand_indices = random_.Permutate(pop_size, pop_size);
     for (int i = 0; i < pop_size / 2; i++)
@@ -258,7 +254,7 @@ Population GA_CPU::Variation(Population &pop)
         Individual p1 = pop[rand_indices[i]];
         Individual p2 = pop[rand_indices[i + pop_size / 2 - 1]];
         
-        vector<real> cf = generate_cf(dim);
+        vector<Real> cf = generate_cf(dim);
         // crossover
         Individual c1 = crossover(p1, p2, cf);
         Individual c2 = crossover(p2, p1, cf);
@@ -294,20 +290,15 @@ int GA_CPU::ConfigureEA(EAInfo EA_info)
 {
     return 0;
 }
-DE_CPU::DE_CPU(NodeInfo node_info)
-{
-    node_info_ = node_info;
-}
 
 DE_CPU::~DE_CPU()
 {
-    EA::Uninitialize();
 }
 
 string DE_CPU::GetParameters(DEInfo DE_info)
 {
     stringstream ss;
-    ss << "rand/1/bin";
+    ss << "DE/rand/1/bin";
     return ss.str();
 }
 
@@ -323,15 +314,10 @@ int DE_CPU::ConfigureEA(DEInfo DE_info)
     return 0;
 }
 
-int DE_CPU::Uninitialize()
-{
-    return 0;
-}
-
 Population DE_CPU::Variation(Population &population)
 {
-    real F = DE_info_.F;
-    real CR = DE_info_.CR;
+    Real F = DE_info_.F;
+    Real CR = DE_info_.CR;
     Population offsp;
     for (int i = 0; i < island_info_.island_size; i++)
     {
@@ -373,15 +359,15 @@ Population DE_CPU::Survival(Population &pop, Population &offsp, EvolveRewards &o
     return pop;
 }
 
-real DE_CPU::Run(Population & population, unique_ptr<Evaluator> &eval)
+Real DE_CPU::Run(Population & population, unique_ptr<Evaluator> &eval)
 {
     int update_num = ReproduceV2(population, eval);
-    return update_num/(real)island_info_.island_size;
+    return update_num/(Real)island_info_.island_size;
 }
 int DE_CPU::ReproduceV2(Population & population, unique_ptr<Evaluator> &eval)
 {
-    real F = DE_info_.F;
-    real CR = DE_info_.CR;
+    Real F = DE_info_.F;
+    Real CR = DE_info_.CR;
     int update_num = 0;
     for (int i = 0; i < island_info_.island_size; i++)
     {

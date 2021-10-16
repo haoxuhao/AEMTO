@@ -1,9 +1,5 @@
 #ifndef __RECORD_H__
 #define __RECORD_H__
-#include <mpi.h>
-#include <sstream>
-#include <EA.h>
-#include <map>
 #include "json.hpp"
 #include "config.h"
 
@@ -13,67 +9,52 @@ struct RecordInfo
 {
     string tag;
     int generation;
-    real time;
-    real comm_time;
-    real best_fitness;
-    vector<real> elements;
-};
-
-struct ReuseInfo
-{
-    real best_fitness_update;
-    real update_rate_of_self_evolve;
-    real update_rate_of_reuse;
-    real import_prob;
-    unordered_map<int, real> rewards_table;
+    Real best_fitness;
+    vector<Real> elements;
 };
 
 class Record
 {
 private:
-    NodeInfo            node_info_;
-    IslandInfo          island_info_;
-    ProblemInfo         problem_info_;
-    EAInfo              EA_info_;
-    string 				file_name_;
-    map<int, real>      summed_fes;
-
-    // json for save results of multiple runs
-    json                 json_results;
+    json json_results;
+    Args args_;
+    int task_id_{0};
+    string save_file;
     
 public:
-						Record(const NodeInfo node_info);
-						~Record();
-	int                 Initialize(IslandInfo island_info, ProblemInfo problem_info, EAInfo EA_info);
-	int                 Uninitialize();
+	Record(const Args &args, int task_id): args_(args), task_id_(task_id) {
+        json_results = json::array();
+        save_file = args_.results_dir+ "/" + args_.results_subdir + 
+                    "/res_task_" + std::to_string(task_id_) + ".json";
+    };
+	~Record() {};
+    void RecordInfos(RecordInfo &info) {
+        record_generations.emplace_back(info.generation);
+        record_solutions.emplace_back(info.elements);
+        record_best_fitnesses.emplace_back(info.best_fitness);
+    };
+    int FlushInfos(int run_id = 0) {
+        json res;
+        res["run_id"] = run_id;
+        res["fitness_values"] = record_best_fitnesses;
+        res["generations"] = record_generations;
+        if (record_solutions.size() > 0){
+            res["best_solutions"] = record_solutions[record_solutions.size()-1];
+        } 
+        json_results.emplace_back(res);
+        ofstream ofs(save_file, ios::out); 
+        ofs << json_results.dump() << endl;
+        return 0;
+    };
+    void Clear() {
+        record_generations.clear();
+        record_solutions.clear();
+        record_best_fitnesses.clear();
+    };
 
-    int                 RecordInfos(RecordInfo &info);
-    int                 RecordKnowledgeReuseInfo(real fitness_update,
-                                                unordered_map<int, real> &success_insert_rate,
-                                                real update_rate_of_self_evolve,
-                                                real update_rate_of_reuse);
-    int                 RecordKnowledgeReuseInfo(ReuseInfo &info);
-    int                 FlushInfos();
-
-    unordered_map<string, real> time_section;
-    int transfer_cnt;
- 
-    int    RECORD_INTERVAL;
-    
-    // record infos
-    vector<real>        record_best_fitnesses;
+    vector<Real>        record_best_fitnesses;
     vector<int>         record_generations;
-    vector<real>        record_time_points;
-    vector<vector<real>>    record_solutions;
-    vector<real>        record_best_fitness_update_after_reuse;
-    vector<unordered_map<int, real>> record_success_insert_rate_in_reuse;
-    vector<real>        record_update_rate_of_self_evolve;
-    vector<real>        record_update_rate_of_reuse;
-    vector<real>        record_import_prob;
-    vector<vector<real>> recored_selection_probs;
-    vector<real> success_offsprings_rate;
-    vector<real> success_best_update_rate;
-    vector<pair<int, real>>        record_mean_fitness;
+    vector<vector<Real>>    record_solutions;
 };
 
 #endif

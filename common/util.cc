@@ -21,6 +21,7 @@ vector<string> &split(const string &str, char delim, vector<string> &elems, bool
 
 vector<string> split(const string &str, char delim, bool skip_empty)
 {
+    assert(str != "" && "split input is empty string");
     istringstream iss(str);
     vector<string> elems;
     for (string item; getline(iss, item, delim);)
@@ -78,7 +79,7 @@ vector<int> argsort_population(const Population &v)
     return idx;
 }
 
-vector<int> argsort(const vector<real> &v)
+vector<int> argsort(const vector<Real> &v)
 {
     // initialize original index locations
     vector<int> idx(v.size());
@@ -90,7 +91,7 @@ vector<int> argsort(const vector<real> &v)
     return idx; 
 }
 
-real median(vector<real> len)
+Real median(vector<Real> len)
 {
     if (len.size() < 1)
         return std::numeric_limits<double>::signaling_NaN();
@@ -111,9 +112,9 @@ real median(vector<real> len)
     return 0.5 * (*i1 + *i2);
 }
 
-real L2_dist(vector<real> &x, vector<real> &y)
+Real L2_dist(vector<Real> &x, vector<Real> &y)
 {
-    real sum = 0;
+    Real sum = 0;
     for(int i = 0; i < x.size(); i++)
     {
         sum += (x[i] - y[i]) * (x[i] - y[i]); 
@@ -140,7 +141,7 @@ Mat matrix_multiply(const Mat &a, const Mat &b)
     assert(a.size() > 0 && b.size() > 0 && a[0].size() > 0 && b[0].size() > 0);
     assert(a[0].size() == b.size() && "a*b, a's columns == b's rows required.");
     int m = a.size(), n = b[0].size();
-    Mat res(m, vector<real>(n, 0.0));
+    Mat res(m, vector<Real>(n, 0.0));
     for (int i = 0; i < m; i++)
     {
         for (int j = 0; j < n; j++)
@@ -158,7 +159,7 @@ Mat matrix_transpose(const Mat &a)
 {
     assert(a.size() > 0 && a[0].size() > 0);
     int m = a.size(), n = a[0].size();
-    Mat res(n, vector<real>(m, 0.0));
+    Mat res(n, vector<Real>(m, 0.0));
     for (int i = 0; i < n; i++)
     {
         for (int j = 0; j < m; j++)
