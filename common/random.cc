@@ -2,20 +2,11 @@
 #include <functional>
 #include <algorithm>
 
-Random::Random():distribution(0, RAND_MAX)
-{
+// Random::Random() {}
 
-}
+// Random::~Random() {}
 
-
-Random::~Random()
-{
-
-}
-
-/**
- * Return a 2D random matrix, range from [0, 1]
- */
+// value ~ U(0, 1)
 vector<vector<real>> Random::RandReal2D(int r, int c)
 {
 	vector<vector<real>> ret;
@@ -30,10 +21,8 @@ vector<vector<real>> Random::RandReal2D(int r, int c)
 	}
 	return ret;
 }
-
 int Random::RandIntUnif(int min_value, int max_value)
 {
-	//int rand_num = distribution(generator);
 	if (min_value != max_value)
 		return min_value + rand() % (max_value - min_value + 1);
 	else
@@ -41,8 +30,6 @@ int Random::RandIntUnif(int min_value, int max_value)
 }
 real Random::RandRealUnif(real min_value, real max_value)
 {
-	//int rand_num = distribution(generator);
-	// auto dice = std::bind(distribution, generator);
 	if (min_value != max_value)
 		return min_value + rand() / ((real) RAND_MAX + 0.0) * (max_value - min_value + 0.0);
 	else
@@ -51,6 +38,7 @@ real Random::RandRealUnif(real min_value, real max_value)
 real Random::RandRealNormal(real u, real std)
 {
 	std::normal_distribution<double> distribution(u, std);
+	static std::default_random_engine generator;
 	return distribution(generator);
 }
 
@@ -74,7 +62,7 @@ vector<int> Random::Permutate(int arrary_length, int permutation_length)
 	int tmp = 0;
 	int i = arrary_length;
 
-	while (i > arrary_length - permutation_length)     //pm_depth is the number of random indices wanted (must be <= NP)
+	while (i > arrary_length - permutation_length)
 	{
 		tmp = RandIntUnif(0, (i - 1));
 		permutate_index.push_back(global_perm[tmp]);
@@ -122,60 +110,6 @@ vector<int>	Random::Permutate(int arrary_length, int permutation_length, vector<
 	return permutate_index;
 }
 
-int Random::Permutate(vector<int> & permutate_index, int arrary_length, int permutation_length)
-{
-	assert((arrary_length > 0 || permutation_length >= 0) && "Assert error: array_length <= 0 or permutation_length < 0");
-	if(permutation_length > arrary_length)
-	{
-		printf("permutation_length=%d\arrary_length=%d\t", permutation_length, arrary_length);
-		permutation_length = arrary_length;
-	}
-	vector<int> global_perm(arrary_length);
-	for (int local_ind_individual = 0; local_ind_individual < arrary_length; local_ind_individual++)
-		global_perm[local_ind_individual] = local_ind_individual;
-
-	int tmp = 0;
-	int i = arrary_length;
-
-	while (i > arrary_length - permutation_length)     //pm_depth is the number of random indices wanted (must be <= NP)
-	{
-		tmp = RandIntUnif(0, (i - 1));
-		permutate_index.push_back(global_perm[tmp]);
-		global_perm[tmp] = global_perm[i - 1];
-		i--;
-	}
-	return 0;
-
-}
-
-int Random::Permutate(int * permutate_index, int arrary_length, int permutation_length)
-{
-	assert((arrary_length > 0 || permutation_length >= 0) && "Assert error: array_length <= 0 or permutation_length < 0");
-	if(permutation_length > arrary_length)
-	{
-		printf("permutation_length=%d\arrary_length=%d\t", permutation_length, arrary_length);
-		permutation_length = arrary_length;
-	}
-	vector<int> global_perm(arrary_length);
-	for (int local_ind_individual = 0; local_ind_individual < arrary_length; local_ind_individual++)
-		global_perm[local_ind_individual] = local_ind_individual;
-
-	int tmp = 0;
-	int i = arrary_length;
-	int count = 0;
-	while (i > arrary_length - permutation_length)     //pm_depth is the number of random indices wanted (must be <= NP)
-	{
-		tmp = RandIntUnif(0, (i - 1));
-		permutate_index[count] = global_perm[tmp];
-		global_perm[tmp] = global_perm[i - 1];
-		i--;
-		count++;
-	}
-	return 0;
-}
-/**
- * return selected index
- */
 int Random::roulette_sampling(vector<real> &pdf)
 {
 	real p = RandRealUnif(0, 1);
@@ -231,4 +165,48 @@ vector<int> Random::roulette_sample(vector<real> &fitnesses, int num)
         ret_indices.push_back(loc_index);
     }
     return ret_indices;
+}
+
+vector<int> Random::sus_sample(const vector<real> &pdf, int num)
+{
+	vector<int> ret;
+	ret.reserve(num);
+	real pdf_sum = accumulate(pdf.begin(), pdf.end(), 0.0);
+	real pointer_dist = pdf_sum / num;
+	real p = RandRealUnif(0, pointer_dist);
+	int I = 0;
+	real acc = pdf[I];
+	for (int i = 0; i < num; i++) {
+		while (acc < p && (I < (pdf.size() - 1)))
+		{
+			acc += pdf[++I];
+		}
+		ret.push_back(I);
+		p += pointer_dist;
+	}
+	return ret;   
+}
+
+unordered_map<int, int> Random::sus_sampleV2(const vector<real> &pdf, int num)
+{
+	unordered_map<int, int> ret;
+	ret.reserve(num);
+	real pdf_sum = accumulate(pdf.begin(), pdf.end(), 0.0);
+	real pointer_dist = pdf_sum / num;
+	real p = RandRealUnif(0, pointer_dist);
+	int I = 0;
+	real acc = pdf[I];
+	for (int i = 0; i < num; i++) {
+		while (acc < p && (I < (pdf.size() - 1)))
+		{
+			acc += pdf[++I];
+		}
+		if (ret.find(I) == ret.end()) {
+			ret[I] = 1;
+		} else {
+			ret[I] ++;
+		}
+		p += pointer_dist;
+	}
+	return ret;   
 }

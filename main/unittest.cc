@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 #include "config.h"
 #include "random.h"
 #include "util.h"
@@ -96,7 +97,28 @@ int main()
     //============================
     // matrix_test();
     //============================
-    arm_eval_test();
-    
+    // arm_eval_test();
+
+    // sus sample test
+    // vector<real> pdf = {0.18, 0.16, 0.15, 0.13, 0.11, 0.09, 0.13, 0.05};
+    vector<real> pdf = {0.18, 0.16, 0.15, 0.13, 0.11, 0.09, 0.07, 0.06, 0.03, 0.02, 0.1};
+    real pdf_sum = accumulate(pdf.begin(), pdf.end(), 0.0);
+    std::for_each(pdf.begin(), pdf.end(), [&](real &x) {x /= pdf_sum;});
+    int sele_num = 20;
+    Random rand_;
+    vector<int> sel_indices = rand_.sus_sample(pdf, sele_num);
+    unordered_map<int, int> task_selected_times;
+    for(int i = 0; i < sel_indices.size(); i++) {
+        cout << "pointer " << i << ", index " << sel_indices[i] << endl;
+        if (task_selected_times.find(sel_indices[i]) == task_selected_times.end()) {
+            task_selected_times[sel_indices[i]] = 1;
+        } else {
+            task_selected_times[sel_indices[i]]++;
+        }
+    }
+    for (const auto & e: task_selected_times) {
+        cout << "random res: key " << e.first << ", val " << e.second << endl;
+    }
+
     return 0;
 }

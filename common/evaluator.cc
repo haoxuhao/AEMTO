@@ -122,21 +122,6 @@ real BenchFuncEvaluator::EvaluateFitness(const vector<real> & elements)
 		case 9:
 			schwefel_func(pop_original, &fitness_value, calc_dim_, OShift, Mdata, 1, rotation_flag_, fixed_shift_, 1);
 			break;
-		case 26:
-			cf04(pop_original, &fitness_value, calc_dim_, OShift, Mdata, 1);
-			break;
-		case 27:
-			cf05(pop_original, &fitness_value, calc_dim_, OShift, Mdata, 1);
-			break;
-		case 28:
-			cf06(pop_original, &fitness_value, calc_dim_, OShift, Mdata, 1);
-			break;
-		case 29:
-			cf07(pop_original, &fitness_value, calc_dim_, OShift, Mdata, SS, 1);
-			break;
-		case 30:
-			cf08(pop_original, &fitness_value, calc_dim_, OShift, Mdata, SS, 1);
-			break;
 		default:
 			fprintf(stderr, "Error: invalid function id: %d\n", func_id_);
 			break;
