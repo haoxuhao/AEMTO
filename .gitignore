@@ -1,0 +1,7 @@
+.vscode/
+bin/tmp/
+*.Ds_Store
+bin/Results/
+bin/data/GECCO*
+3rdparty/*
+*__pycache__*
