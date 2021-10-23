@@ -2,34 +2,16 @@
 #include "EA.h"
 #include "util.h"
 
-EA::EA()
-{
-
-}
-
-EA::~EA()
-{
-
-}
-
-int EA::Initialize(IslandInfo island_info, ProblemInfo problem_info, EAInfo EA_info)
-{
-    problem_info_ = problem_info;   
-    island_info_ = island_info;
-    EA_info_ = EA_info;
-    return 0;
-}
-
 int EA::InitializePopulation(Population &pop, unique_ptr<Evaluator> &eval)
 {
-   for(int i = 0; i < island_info_.island_size; i++)
+   for(int i = 0; i < pop.size(); i++)
     {
-        Individual tmp_individual;
+        Individual &tmp_individual = pop.at(i);
         for (int j = 0; j < problem_info_.dim; j++)
-            tmp_individual.elements.push_back(random_.RandRealUnif(problem_info_.min_bound, problem_info_.max_bound));
+            tmp_individual.elements[j] = random_.RandRealUnif(problem_info_.min_bound,
+                                              problem_info_.max_bound);
         tmp_individual.fitness_value = eval->EvaluateFitness(tmp_individual.elements);
         tmp_individual.skill_factor = -1;
-        pop.push_back(tmp_individual);
     }
     return 0; 
 }
@@ -50,7 +32,7 @@ Individual EA::FindBestIndividual(Population & population)
 {
     int best_individual_ind = 0;
     double best_individual_fitness_value = population[0].fitness_value;
-    for(int i = 1; i < island_info_.island_size; i++)
+    for(int i = 1; i < population.size(); i++)
     {
         if(population[i].fitness_value < best_individual_fitness_value)
         {
@@ -63,9 +45,9 @@ Individual EA::FindBestIndividual(Population & population)
 
 Population EA::EvaluatePop(Population &p, unique_ptr<Evaluator> &eval)
 {
-    for (auto &i : p)
+    for (auto &individual : p)
     {
-        i.fitness_value = eval->EvaluateFitness(i.elements);
+        individual.fitness_value = eval->EvaluateFitness(individual.elements);
     }
     return p;
 }
@@ -102,34 +84,6 @@ Population EA::Survival(Population &pop, Population &offsp, EvolveRewards &out)
     return pop;
 }
 
-Real EA::PopImprovement(Population &pop_curr, Population &pop_pre)
-{
-    SortPop(pop_curr);
-    SortPop(pop_pre);
-    Real res = 0;
-    int pop_size = (int)pop_curr.size();
-    Real delta = pop_curr[0].fitness_value;
-    for (int i = 0; i < pop_size; i++)
-    {
-        res += delta / pop_curr[i].fitness_value * \
-            (pop_pre[i].fitness_value - pop_curr[i].fitness_value);
-    }
-    res /= (Real) pop_size;
-    res /= delta;
-    return res;
-}
-Real check_bnd(Real x, Real lb, Real ub)
-{
-    while ((x < lb) || (x > ub))
-	{
-		if (x < lb)
-			x = lb + (lb - x);
-		if (x > ub)
-			x = ub - (x - ub);
-	}
- 
-	return x;
-}
 
 Individual binomial_crossover(const Individual &p1, const Individual &p2, Real cr)
 {
@@ -149,10 +103,8 @@ Individual binomial_crossover(const Individual &p1, const Individual &p2, Real c
     }
     return c;
 }
-/*
-    SBX
-*/
-vector<Real> GA_CPU::crossover(const vector<Real> &p1,
+//SBX
+vector<Real> GA::crossover(const vector<Real> &p1,
                                const vector<Real> &p2,
                                const vector<Real> &cf)
 {
@@ -167,17 +119,15 @@ vector<Real> GA_CPU::crossover(const vector<Real> &p1,
     }
     return ret; 
 }
-Individual GA_CPU::crossover(const Individual &p1, const Individual &p2, const vector<Real> &cf)
+Individual GA::crossover(const Individual &p1, const Individual &p2, const vector<Real> &cf)
 {
     Individual ret;
     ret.elements = crossover(p1.elements, p2.elements, cf); 
     return ret;
 }
 
-/*
-    polynomial mutation
-*/
-vector<Real> GA_CPU::mutate(vector<Real> &p)
+// polynomial mutation
+vector<Real> GA::mutate(vector<Real> &p)
 {
     Real mum = EA_info_.ga_param.mum;
     int dim = (int)p.size();
@@ -200,16 +150,14 @@ vector<Real> GA_CPU::mutate(vector<Real> &p)
     }
     return p; 
 }
-Individual GA_CPU::mutate(Individual &p)
+Individual GA::mutate(Individual &p)
 {
     mutate(p.elements);
     return p;
 }
 
-/**
- *  params prepare
- */
-vector<Real> GA_CPU::generate_cf(int dim)
+//params prepare
+vector<Real> GA::generate_cf(int dim)
 {
     vector<Real> cf(dim, 0.0);
     Real mu = EA_info_.ga_param.mu;
@@ -228,7 +176,7 @@ vector<Real> GA_CPU::generate_cf(int dim)
     return cf;
 }
 
-int GA_CPU::swap(vector<Real> &c1, vector<Real> &c2)
+int GA::swap(vector<Real> &c1, vector<Real> &c2)
 {
     Real probswap = EA_info_.ga_param.probswap;
     int dim = c1.size();
@@ -242,7 +190,7 @@ int GA_CPU::swap(vector<Real> &c1, vector<Real> &c2)
         }
     }
 }
-Population GA_CPU::Variation(Population &pop)
+Population GA::Variation(Population &pop)
 {
     int pop_size = (int)pop.size();
     int dim = (int)pop[0].elements.size();
@@ -273,7 +221,7 @@ Population GA_CPU::Variation(Population &pop)
     return offsp;
 }
 
-int GA_CPU::Reproduce(Population &pop, unique_ptr<Evaluator> &eval_func)
+int GA::Reproduce(Population &pop, unique_ptr<Evaluator> &eval_func)
 {
     Population offsp = Variation(pop);
     offsp = EvaluatePop(offsp, eval_func);
@@ -282,53 +230,16 @@ int GA_CPU::Reproduce(Population &pop, unique_ptr<Evaluator> &eval_func)
     return rewards.update_num;
 }
 
-string GA_CPU::GetParameters(DEInfo DE_info)
+Population DE::Variation(Population &population)
 {
-    return "default GA SBX + Polynomial mutation";
-}
-int GA_CPU::ConfigureEA(EAInfo EA_info)
-{
-    return 0;
-}
-
-DE_CPU::~DE_CPU()
-{
-}
-
-string DE_CPU::GetParameters(DEInfo DE_info)
-{
-    stringstream ss;
-    ss << "DE/rand/1/bin";
-    return ss.str();
-}
-
-int DE_CPU::Initialize(IslandInfo island_info, ProblemInfo problem_info, DEInfo DE_info)
-{
-	EA::Initialize(island_info, problem_info, DE_info);
-    DE_info_ = DE_info;
-	return 0;
-}
-int DE_CPU::ConfigureEA(DEInfo DE_info)
-{
-    DE_info_ = DE_info;
-    return 0;
-}
-
-Population DE_CPU::Variation(Population &population)
-{
-    Real F = DE_info_.F;
-    Real CR = DE_info_.CR;
+    Real F = EA_info_.F;
+    Real CR = EA_info_.CR;
     Population offsp;
-    for (int i = 0; i < island_info_.island_size; i++)
+    for (int i = 0; i < population.size(); i++)
     {
         Individual tmp_individual = population[i];
-        vector<int> r = random_.Permutate(island_info_.island_size, 5);
+        vector<int> r = random_.Permutate(population.size(), 5);
         int k = random_.RandIntUnif(0, problem_info_.dim - 1);
-        if(DE_info_.strategy_ID == 9)
-        {
-            CR = random_.RandRealUnif(DE_info_.LCR, DE_info_.UCR);
-            F = random_.RandRealUnif(DE_info_.LF, DE_info_.UF);
-        }
         for (int j = 0; j < problem_info_.dim; j++)
         {
             tmp_individual.elements[j] = population[r[0]].elements[j] + F * (population[r[1]].elements[j] - population[r[2]].elements[j]);
@@ -342,7 +253,7 @@ Population DE_CPU::Variation(Population &population)
     return offsp;
 }
 
-Population DE_CPU::Survival(Population &pop, Population &offsp, EvolveRewards &out)
+Population DE::Survival(Population &pop, Population &offsp, EvolveRewards &out)
 {
     assert(pop.size() == offsp.size() && \
         "size of offspring must be equal to population in DE.");
@@ -359,20 +270,21 @@ Population DE_CPU::Survival(Population &pop, Population &offsp, EvolveRewards &o
     return pop;
 }
 
-Real DE_CPU::Run(Population & population, unique_ptr<Evaluator> &eval)
+Real DE::Run(Population & population, unique_ptr<Evaluator> &eval)
 {
     int update_num = ReproduceV2(population, eval);
-    return update_num/(Real)island_info_.island_size;
+    return update_num/(Real)population.size();
 }
-int DE_CPU::ReproduceV2(Population & population, unique_ptr<Evaluator> &eval)
+
+int DE::ReproduceV2(Population & population, unique_ptr<Evaluator> &eval)
 {
-    Real F = DE_info_.F;
-    Real CR = DE_info_.CR;
+    Real F = EA_info_.F;
+    Real CR = EA_info_.CR;
     int update_num = 0;
-    for (int i = 0; i < island_info_.island_size; i++)
+    for (int i = 0; i < population.size(); i++)
     {
         Individual tmp_individual = population[i];
-        vector<int> r = random_.Permutate(island_info_.island_size, 5);
+        vector<int> r = random_.Permutate(population.size(), 5);
         int k = random_.RandIntUnif(0, problem_info_.dim - 1);
 
         for (int j = 0; j < problem_info_.dim; j++)

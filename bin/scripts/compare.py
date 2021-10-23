@@ -4,14 +4,13 @@
 import copy
 import numpy as np
 import pandas as pd
-import sys
 
 from eval import get_overall_comparisons, COMP_TAG
 from parse_results import get_results, DECIMALS
 from tqdm import tqdm
 
 
-def overall_compare(results, runs=15):
+def overall_compare(results, runs=15, algos=None):
     """ overall comparing results of several algorithms.
     Args:
         results (list): list of results of each algorithm.
@@ -34,7 +33,11 @@ def overall_compare(results, runs=15):
     tasks = sorted(list(results[0].keys()))
     details_data = []
     column_names = []
-    algo_prefix = 'algo_{}_'
+    if algos is None:
+        algo_prefix = 'algo_{}_'
+    else:
+        assert algorithms == len(algos)
+
     for task in tasks:
         task_results = [
             np.around(res[task][:runs], decimals=DECIMALS) for res in results
@@ -49,7 +52,10 @@ def overall_compare(results, runs=15):
             'mean', 'wilcoxon', 'normalized_score', 'f1_score', 'median', 'std'
         ]
         for i, res in enumerate(overall_results):
-            prefix = algo_prefix.format(i)
+            if algos is None:
+                prefix = algo_prefix.format(i)
+            else:
+                prefix = algos[i] + '_'
             for item_name in eval_items:
                 if item_name not in [
                         'wilcoxon', 'f1_score', 'normalized_score'
@@ -72,7 +78,10 @@ def overall_compare(results, runs=15):
                                           averaged_normalized_scores))
     row_dict = {}
     for i in range(algorithms):
-        prefix = algo_prefix.format(i)
+        if algos is None:
+            prefix = algo_prefix.format(i)
+        else:
+            prefix = algos[i] + '_'
         if i != 0:
             overall_res_str = ''
             for k, v in overall_ranksum_test_res[i].items():
@@ -92,7 +101,8 @@ def overall_compare(results, runs=15):
 def summeray_compare(
         results,
         runs=15,
-        save_file='./tmp/detailed_results/overall_comparisons.csv'):
+        save_file='./overall_comparisons.csv',
+        algos=None):
     """ compare several paired results
     Args:
         results (dict): {'problem_name': [res1, res2]}
@@ -123,7 +133,7 @@ def summeray_compare(
 
     for p in problems:
         wilcx_res, norm_scores, f1_scores_, detailed_res_df = overall_compare(
-            results[p], runs=runs)
+            results[p], runs=runs, algos=algos)
         total_detailed_res_df = total_detailed_res_df.append([{'task': p}])
         total_detailed_res_df = total_detailed_res_df.append(detailed_res_df)
 
@@ -147,57 +157,26 @@ def summeray_compare(
 
 
 def build_comparisons():
-    res_dirs = [
-        'Results/{}/smto/DE/deepinsight/mto/{}',
-        'Results/{}/smto/DE/deepinsight/mto_fixed_tsf/{}',
-        'MaTDE/Results/{}/smto/DE/mto/{}',
-        'SBO/Results/{}/smto/DE/mto/{}',
-        'MFEA/Results/{}/smto/DE/mto/{}',
-        'Results/{}/smto/DE/deepinsight/sto/{}',
-    ]
-
-    # tags = ['zero_10']
-    # problem_name = 'matde_problem'
-
-    tags = ['problem{}_2'.format(i) for i in range(1, 10)]
-    problem_name = 'benchmark'
-
-    compared_res = {}
-    for tag in tqdm(tags):
-        print('load algorithm results from problem: {}'.format(tag))
-        compared_res[tag] = [
-            get_results(res.format(problem_name, tag)) for res in res_dirs
-        ]
-    return compared_res
-
-def ci():
-    matde_res_dirs = [
-        'Results/matde_problem_ref/zero_10',
-        'Results/matde_problem/DE/mto/zero_10',
-    ]
-    arm_res_dirs = [
-        'Results/ArmD50_Ref/zero_10',
-        'Results/Arm/DE/mto/zero_10',
-    ]
+    algos = ['AEMTO', 'SBO', 'MFEA', 'MATDE', 'STO']
+    problem_set = 'matde_problem'
+    problem_name = "zero_10"
     compared_res = {
-        'arm_zero_10': [get_results(res) for res in arm_res_dirs],
-        'matde_zero_10': [get_results(res) for res in matde_res_dirs]
+        problem_name : [get_results('Results/{}/{}/{}'.format(
+            algo, problem_set, problem_name)) for algo in algos]
     }
-    return compared_res
+    return compared_res, algos
 
 
 if __name__ == "__main__":
-    results_to_compare = ci()
-
+    results_to_compare, algo_labels = build_comparisons()
     total_summeray, normalized_scores_total, \
-        f1_scores_total = summeray_compare(results_to_compare, runs=20)
-
+        f1_scores_total = summeray_compare(results_to_compare, runs=10, algos=algo_labels)
     print('\n========================== summeray =========================\n')
     print(" .  wilcoxon total summeray: ")
     for i, item in enumerate(total_summeray):
         item_str = '{}/{}/{}'.format(item['t'], item['w'], item['l'])
-        print(' .  algo {}: total comparisons to algo 0  ties/wins/losses: {}'.
-              format(i + 1, item_str))
+        print(' .  algo {}: total comparisons to algo {} ties/wins/losses: {}'.
+              format(algo_labels[i+1], algo_labels[0], item_str))
     print(" .  normalized scores: {}".format(', '.join(
         ['%.4f' % a for a in normalized_scores_total])))
     print(" .  f1 scores: {}".format(', '.join(

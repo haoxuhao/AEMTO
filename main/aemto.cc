@@ -9,102 +9,74 @@
 
 using namespace std;
 
-bool MTO = true;
 const Real eps = 1e-10;
 int run_id = 0;
 int ntasks;
-int RUNS = 1;
-int G_max = 1000;
 Real p_tsf_lb = 0.05; // lower bound of transfer probability
 Real p_tsf_ub = 0.70; // upper ...
 Real alpha=0.3; // reward update rate
-Real pbase=0.2;
+Real pbase=0.3;
 
-vector<Real> tasks_tsf_probs;
-vector<Real> tasks_rewards_self;
-vector<Real> tasks_rewards_other;
-vector<int> tasks_tsf_cnt;
-vector<vector<Real>> tasks_selection_pdf;
-vector<vector<Real>> tasks_selection_rewards;
-
+vector<Real> tasks_tsf_probs; // transfer prob of each task
+vector<Real> tasks_rewards_self; // rewards of self eval of each task
+vector<Real> tasks_rewards_other; // rewards of inter-task transfer of each task
+vector<vector<Real>> tasks_selection_pdf; // selection pdf of each task
+vector<vector<Real>> tasks_selection_rewards; // selection rewards of each task
+vector<int> tasks_tsf_cnt; //record transfer count of each task
 vector<unique_ptr<Evaluator> > task_evals; // evaluator of each task
-vector<IslandInfo> island_infos;
 vector<ProblemInfo> problem_infos;
-vector<EAInfo> ea_infos;
 unique_ptr<EA> EA_solver;
+EAInfo EA_info;
 
-vector<Population> pop_tasks;
-vector<Record> record_tasks;
+vector<Population> pop_tasks; // population of each task
+vector<Record> record_tasks; // record of each task
 Random rand_;
 Args args;
 
 
 int global_init(int argc, char* argv[])
 {
-    IslandInfo island_info;
-    ProblemInfo problem_info;
-    EAInfo EA_info;
-    int ret = SetParameters(island_info, problem_info, \
-            EA_info, args, argc, argv);
-    
+    int ret = SetParameters(argc, argv, args, EA_info);
     if(ret != 0)
     {
         fprintf(stderr,"Error: set parameters error.\n");
         exit(-1);
     }
-    
-    string result_dir = args.results_dir + "/" + args.results_subdir;
-    mkdirs(result_dir.c_str());
-
-    RUNS = args.total_runs;
-
-    for(int i=0; i<args.total_tasks.size(); i++)
-    {
-        problem_info.task_id = args.total_tasks[i];
-        problem_info.total_runs = args.total_runs;
-        if(GetProblemInfo(args, problem_info) != 0) 
+    mkdirs(args.results_dir.c_str());
+    args.total_runs = args.total_runs;
+    problem_infos = GetProblemInfos(args);
+    for (int i  = 0; i < args.total_tasks.size(); i++) {
+        if (args.problem_set == "Arm")
         {
-            fprintf(stderr, "Error: get task %d info error.\n", problem_info.task_id);
-            return -1;
-        }
-        if (problem_info.problem_def == "Arm")
-        {
-            unique_ptr<Evaluator> eval_func(new ArmEvaluator(problem_info));
+            unique_ptr<Evaluator> eval_func(new ArmEvaluator(problem_infos[i]));
             task_evals.push_back(std::move(eval_func));
         } else {
-            unique_ptr<Evaluator> eval_func(new BenchFuncEvaluator(problem_info));
+            unique_ptr<Evaluator> eval_func(new BenchFuncEvaluator(problem_infos[i]));
             task_evals.push_back(std::move(eval_func));
         }
-
         record_tasks.emplace_back(args, args.total_tasks[i]);
-
-        island_infos.push_back(island_info);
-        ea_infos.push_back(EA_info);
-        problem_infos.push_back(problem_info);
+        problem_infos.push_back(problem_infos[i]);
     }
     if (EA_info.STO == "GA")
     {
-        EA_solver.reset(new GA_CPU());
-        EA_solver->Initialize(island_info, problem_info, EA_info);
+        EA_solver.reset(new GA(problem_infos[0], EA_info));
     }else if (EA_info.STO == "DE")
     {
-        EA_solver.reset(new DE_CPU());
-        EA_solver->Initialize(island_info, problem_info, EA_info);
+        EA_solver.reset(new DE(problem_infos[0], EA_info));
     }
     else{
         fprintf(stderr, "Error no EA solver found: %s.\n", EA_info.STO.c_str());
         exit(-1);
     }
-    G_max = args.G_max;
     ntasks = (int)args.total_tasks.size();
     fprintf(stderr, "=================== INFO ============\n");
-    fprintf(stderr, "total tasks = %d; total runs = %d\n", ntasks, RUNS);
-    fprintf(stderr, "pop_size x m = %dx%d\n", island_info.island_size, ntasks);
-    fprintf(stderr, "G_max = %d\n", G_max);
-    fprintf(stderr, "results dir = %s\n", result_dir.c_str());
+    fprintf(stderr, "total tasks = %d; total runs = %d\n", ntasks, args.total_runs);
+    fprintf(stderr, "pop_size x m = %dx%d\n", args.popsize, ntasks);
+    fprintf(stderr, "Gmax = %d\n", args.Gmax);
+    fprintf(stderr, "results dir = %s\n", args.results_dir.c_str());
     fprintf(stderr, "EA solver = %s.\n", EA_info.STO.c_str());
-    fprintf(stderr, "problem set = %s.\n", problem_info.problem_def.c_str());
-    fprintf(stderr, "MTO = %d\n", MTO);
+    fprintf(stderr, "problem set = %s.\n", args.problem_set.c_str());
+    fprintf(stderr, "MTO = %d\n", args.MTO);
 
     return 0;
 }
@@ -144,7 +116,7 @@ Real Reuse(int task_id, Population &pop, Population &other_pop,
     {
         Individual mu = other_pop.at(rand_indexs[k % other_pop_size]);
         Individual x = pop.at(k);
-        Real cr = rand_.RandRealUnif(ea_infos[task_id].LKTCR, ea_infos[task_id].UKTCR);
+        Real cr = rand_.RandRealUnif(EA_info.LKTCR, EA_info.UKTCR);
         Individual c = binomial_crossover(x, mu, cr);
         c.fitness_value = task_evals[task_id]->EvaluateFitness(c.elements);
         if (c.fitness_value < x.fitness_value)
@@ -187,6 +159,7 @@ void initialize()
     pop_tasks.resize(ntasks, Population());
     for (int i = 0; i < ntasks; i++)
     {
+        pop_tasks[i].resize(args.popsize, Individual(args.UDim));
         EA_solver->InitializePopulation(pop_tasks[i], task_evals[i]);
         tasks_selection_pdf.push_back(vector<Real>(ntasks, 1.0 / (ntasks - 1)));
         tasks_selection_pdf.back()[i] = 0.0; // prob of selecting task itself is 0.0
@@ -209,24 +182,20 @@ void uninitialize()
     tasks_tsf_cnt.clear();
     tasks_selection_pdf.clear();
     tasks_selection_rewards.clear();
-    for(int i = 0; i < ntasks; i++)
-    {
-        record_tasks[i].Clear();
-    }
 }
 
 void AEMTO()
 {
 	initialize();
 	int g = 0;
-	while (g < G_max)
+	while (g < args.Gmax)
     {
         for (int task_id = 0; task_id < ntasks; task_id++)
         {
-            if (MTO && (rand_.RandRealUnif(0.0, 1.0) <= tasks_tsf_probs[task_id]))
+            if (args.MTO && (rand_.RandRealUnif(0.0, 1.0) <= tasks_tsf_probs[task_id]))
             {
                 auto select_table = rand_.sus_sampleV2(
-                    tasks_selection_pdf[task_id], island_infos[task_id].island_size);
+                    tasks_selection_pdf[task_id], args.popsize);
                 auto other_pop = select_from_others(select_table); 
                 unordered_map<int, int> success_table;
                 Real r_tsf = Reuse(task_id, pop_tasks[task_id], other_pop, success_table);
@@ -250,7 +219,7 @@ void AEMTO()
                 Real bestf = ind.fitness_value; 
                 fprintf(stderr, "task %d; runs %d/%d; gens %d/%d; tsf count %d; "
                                 "tsf_prob %.4f; bestf %.12f\n",
-                                 i + 1, run_id + 1, RUNS, g+1, G_max, tasks_tsf_cnt[i], 
+                                 i + 1, run_id + 1, args.total_runs, g+1, args.Gmax, tasks_tsf_cnt[i], 
                                  tasks_tsf_probs[i], bestf);
                 RecordInfo info;
                 info.best_fitness = bestf;
@@ -273,21 +242,22 @@ void AEMTO()
                         i+1, run_id + 1, ss.str().c_str(), 
                         bestf);
         record_tasks[i].FlushInfos(run_id);
+        record_tasks[i].Clear();
     }
     uninitialize();
 }
 int main(int argc, char* argv[])
 {
-	clock_t start = clock();
+	auto start = get_wall_time();
     global_init(argc, argv);
-	for (run_id = 0; run_id < RUNS; run_id++)
+	for (run_id = 0; run_id < args.total_runs; run_id++)
 	{
         double time_start = get_wall_time();
 		srand((run_id + 1)*10000);
 		AEMTO();
-        cout << "one run cost time " << get_wall_time() - time_start << endl;
+        cout << "one run cost time " << get_wall_time() - time_start << " seconds" << endl;
 	}
-	cout << "total time cost: " << (double)(clock() - start) / CLOCKS_PER_SEC 
-          << " seconds for " << RUNS << " RUNS" << endl;
+	cout << "total time cost: " << get_wall_time() - start
+          << " seconds for " << args.total_runs << " runs" << endl;
 	return 0;
 }

@@ -112,7 +112,7 @@ void ArmEvaluator::LoadTaskData()
 		fprintf(stderr, "Error: get line %d from file %s.\n", problem_info_.task_id, problem_info_.arm_data_file.c_str());	
 		exit(0);
 	}
-	fprintf(stderr, "Note load data from %s in line %d\n", problem_info_.arm_data_file.c_str(), problem_info_.task_id);
+	// fprintf(stderr, "Note load data from %s in line %d\n", problem_info_.arm_data_file.c_str(), problem_info_.task_id);
 }
 
 ArmEvaluator::ArmEvaluator(const ProblemInfo &problem_info)

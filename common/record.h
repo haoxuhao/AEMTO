@@ -24,7 +24,7 @@ private:
 public:
 	Record(const Args &args, int task_id): args_(args), task_id_(task_id) {
         json_results = json::array();
-        save_file = args_.results_dir+ "/" + args_.results_subdir + 
+        save_file = args_.results_dir + 
                     "/res_task_" + std::to_string(task_id_) + ".json";
     };
 	~Record() {};

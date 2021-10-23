@@ -1,4 +1,3 @@
-#include <omp.h>
 #include "config.h"
 #include "set_parameters.h"
 #include "evaluator.h"
@@ -7,7 +6,6 @@
 #include "util.h"
 #include "record.h"
 #include "brent.hpp"
-#include <mutex>
 
 using namespace brent;
 using namespace std;
@@ -22,109 +20,71 @@ struct Chromosome
 };
 typedef Chromosome Chro;
 
-const Real pm = 1;
-bool MTO = true;
-int generation;	
+
+const Real pm = 1; // probability of mutation
+bool MFEA2 = true; // whether update the RMP matrix adaptively
 int	evals;	
-int job;
-int ntasks;
-int pop_size;
-int D;
-int RUNS = 1;
-int MAX_GENS = 1000;
-long MAX_EVALS = 100000;
+int run_id;
+int ntasks; // number of tasks
+int pop_size; // pop size of whole population
+int D; // Dim of unified searched space
 
-vector<int> vars;
-vector<vector<Real>> RMP;
-vector<Chromosome> pop_all;
-vector<pair<Real, int>> best_objs; //best <obj, index> of each task.
-
-vector<unique_ptr<Evaluator>> manytask_funs;
-mutex mutexes[50];
-vector<IslandInfo> island_infos;
-vector<ProblemInfo> problem_infos;
-vector<EAInfo> ea_infos;
-vector<Record> record_tasks;
-Random random_;
-string result_dir;
-GA_CPU *EA_solver;
-Args args;
+vector<int> calc_dims; // evaluation dim of each task
+vector<vector<Real>> RMP; // random mating matrix
+vector<Chromosome> pop_all; // one population for all tasks
+vector<pair<Real, int>> best_objs; //record the best individual of each task <obj, index in the pop> 
+vector<unique_ptr<Evaluator>> task_evals; // evaluator of each task
+vector<ProblemInfo> problem_infos; // problem info of each task
+vector<Record> record_tasks; // record class of each task
+Random random_; // Random helper class
+unique_ptr<GA> EA_solver; // GA solver 
+EAInfo EA_info; // params of GA
+Args args; // global args
 
 vector<int> find_in_pop(const vector<Chro> &pop, int skill_factor);
 
 int global_init(int argc, char* argv[])
 {
-    IslandInfo island_info;
-    ProblemInfo problem_info;
-    EAInfo EA_info;
-    int ret = SetParameters(island_info, problem_info,\
-            EA_info, args, argc, argv);
-    
+     int ret = SetParameters(argc, argv, args, EA_info);
     if(ret != 0)
     {
         fprintf(stderr,"Error: set parameters error.\n");
         exit(-1);
     }
-    
-    result_dir = args.results_dir + "/" + args.results_subdir;
     mkdirs(args.results_dir.c_str());
-    mkdirs(result_dir.c_str());
-
-    RUNS = args.total_runs;
-    for(int i=0; i<args.total_tasks.size(); i++)
-    {
-        problem_info.task_id = args.total_tasks[i];
-        problem_info.total_runs = args.total_runs;
-        if(GetProblemInfo(args, problem_info) != 0) 
+    args.total_runs = args.total_runs;
+    problem_infos = GetProblemInfos(args);
+    for (int i  = 0; i < args.total_tasks.size(); i++) {
+        if (args.problem_set == "Arm")
         {
-            fprintf(stderr, "Error: get task %d info error from file %s.\n", problem_info.task_id);
-            return -1;
+            unique_ptr<Evaluator> eval_func(new ArmEvaluator(problem_infos[i]));
+            task_evals.push_back(std::move(eval_func));
+        } else {
+            unique_ptr<Evaluator> eval_func(new BenchFuncEvaluator(problem_infos[i]));
+            task_evals.push_back(std::move(eval_func));
         }
-        if (problem_info.problem_def == "Arm")
-        {
-            unique_ptr<Evaluator> eval_func(new ArmEvaluator(problem_info));
-            manytask_funs.push_back(std::move(eval_func));
-        }else {
-            unique_ptr<Evaluator> eval_func(new BenchFuncEvaluator(problem_info));
-            manytask_funs.push_back(std::move(eval_func));
-        }
-	    
-        Record record = Record(args, args.total_tasks[i]);
-        record_tasks.push_back(record);
-
-        island_infos.push_back(island_info);
-        ea_infos.push_back(EA_info);
-        problem_infos.push_back(problem_info);
-
-        vars.push_back(problem_info.calc_dim);
+        record_tasks.emplace_back(args, args.total_tasks[i]);
+        problem_infos.push_back(problem_infos[i]);
+        calc_dims.push_back(problem_infos[i].calc_dim);
     }
 
-    MAX_GENS = args.G_max;
     ntasks = (int)args.total_tasks.size();
-
+    EA_info.STO = "GA";
     if (EA_info.STO == "GA")
 	{
-		EA_solver = new GA_CPU();
-        EA_solver->Initialize(island_info, problem_info, EA_info);
-        
+		EA_solver.reset(new GA(problem_infos[0], EA_info));
 	} else{
         fprintf(stderr, "Error no EA solver found for MFEA: %s.\n", EA_info.STO.c_str());
         exit(-1);
     }
     fprintf(stderr, "=================== Init INFO ============\n");
-    fprintf(stderr, "total tasks = %d; total runs = %d\n", ntasks, RUNS);
-    fprintf(stderr, "pop_sizexm = %dx%d\n", island_info.island_size, ntasks);
-    fprintf(stderr, "MAX_GENS = %d\n", MAX_GENS);
-    fprintf(stderr, "results dir = %s\n", result_dir.c_str());
+    fprintf(stderr, "total tasks = %d; total runs = %d\n", ntasks, args.total_runs);
+    fprintf(stderr, "pop_sizexm = %dx%d\n", args.popsize, ntasks);
+    fprintf(stderr, "args.Gmax = %d\n", args.Gmax);
+    fprintf(stderr, "results dir = %s\n", args.results_dir.c_str());
     fprintf(stderr, "EA solver = %s.\n", EA_info.STO.c_str());
-    fprintf(stderr, "MTO = %d\n", MTO);
+    fprintf(stderr, "MTO = %d\n", args.MTO);
     
-    return 0;
-}
-
-int global_deinit()
-{
-    delete EA_solver;
     return 0;
 }
 
@@ -200,7 +160,6 @@ tuple<vector<Real>, vector<Real>, int, vector<int>> probmodel(vector<Chro> &pop,
     int nrandsamples = 0.1 * nsamples;
     vector<vector<Real>> rand_mat = random_.RandReal2D(nrandsamples, D);
 
-    // #pragma omp parallel for
     for (int k = 0; k < D; k++)
     {
         Real s = 0;
@@ -244,9 +203,8 @@ int update_RMP(vector<Chro> &pop)
     {
         probmodels.emplace_back(probmodel(pop, i));
     }
-    printf("prob model build time %f\n", get_wall_time() - s);
+    // printf("prob model build time %f\n", get_wall_time() - s);
 
-    // printf("init probmodel ok.\n");
     vector<pair<int, int>> items_to_calc;
     vector<ProbMat*> probmats;
     for (int i = 0; i < ntasks; i++)
@@ -259,7 +217,6 @@ int update_RMP(vector<Chro> &pop)
         }
     }
     int num_items = items_to_calc.size();
-    // printf("prepare parallel rmp calc ok, number to calc %d.\n", num_items);
     Real t = r8_epsilon();
     Real e = t;
     Real a = 0;
@@ -273,7 +230,7 @@ int update_RMP(vector<Chro> &pop)
     {
         int i = items_to_calc.at(n).first;
         int j = items_to_calc.at(n).second;
-        int dims = min(vars.at(i), vars.at(j));
+        int dims = min(calc_dims.at(i), calc_dims.at(j));
 
         const vector<Real> &mean_i = std::get<0>(probmodels[i]);
         const vector<Real> &mean_j = std::get<0>(probmodels[j]);
@@ -289,7 +246,6 @@ int update_RMP(vector<Chro> &pop)
 
         probmats[n][0].probmat.resize(nsamples_i, vector<Real>(2, 1.0));
         probmats[n][1].probmat.resize(nsamples_j, vector<Real>(2, 1.0));
-        // Real s1 = get_wall_time();
         for (int k = 0; k < nsamples_i; k++)
         {
             for (int l = 0; l < dims; l++)
@@ -306,20 +262,15 @@ int update_RMP(vector<Chro> &pop)
                 probmats[n][1].probmat[k][1] *= norm_pdf(pop_all.at(indices_j.at(k)).elements[l], mean_j.at(l), std_j.at(l));
             }
         }
-        // printf("build mixture model 1 cost time %f\n", get_wall_time() - s1);
         Real rmp = 0.0; //init guess
         MyFunc f3 = MyFunc(probmats[n]);
-        // Real ret = local_min(a, b, t, f3, rmp);
         Real start = get_wall_time();
         Real ret = glomin(a, b, c, m, e, t, f3, rmp);
-        // printf("fminbnd cost time %f s\n", get_wall_time() - start);
         RMP[i][j] = max(0.0, rmp + random_.RandRealNormal(0, 0.01));
         RMP[i][j] = min(RMP[i][j], 1.0);
         RMP[j][i] = RMP[i][j];
-        // printf("optimal rmp found %.4f; RMP (%d, %d): %.3f\n", rmp, i, j, RMP[i][j]);
-        // exit(2);
     }
-    printf("calculate rmp matrix cost time %f\n", get_wall_time() - s2);
+    // printf("calculate rmp matrix cost time %f\n", get_wall_time() - s2);
     //destroy the probmats
     for(int n = 0; n < num_items; n++)
     {
@@ -327,11 +278,7 @@ int update_RMP(vector<Chro> &pop)
     }
     return 0;
 }
-
-
-
 /********* Update rmp matrix related code end **********/
-
 
 int argmax(vector<Real> x, int skip_index)
 {
@@ -381,9 +328,9 @@ pair<int, Real> best_in_pop(const vector<Chro> &p, int skill)
 void initialized()
 {
 	evals = 0;
-    int sub_pop_size = island_infos.at(0).island_size;
+    int sub_pop_size = args.popsize;
     if (sub_pop_size % 2 != 0) sub_pop_size++; // subpopsize must be even
-    D = problem_infos.at(0).dim;
+    D = args.UDim;
     pop_size = sub_pop_size * ntasks;
     pop_all.clear();
     fprintf(stderr, "population size %d, max dim %d\n", pop_size, D);
@@ -400,17 +347,15 @@ void initialized()
             c.skill_factor = i;
             c.factorial_costs = vector<Real>(ntasks, DBL_MAX);
             c.factorial_ranks = vector<int>(ntasks, 2*pop_size + 1);
-            c.factorial_costs.at(i) = manytask_funs.at(i)->EvaluateFitness(c.elements);
+            c.factorial_costs.at(i) = task_evals.at(i)->EvaluateFitness(c.elements);
             c.factorial_ranks.at(i) = j+1;
-            // mutexes[0].lock();
             pop_all.emplace_back(c);
             evals++;
-            // mutexes[0].unlock();
         }
         // the last individual be the initial best individual.
         best_objs.push_back(std::make_pair(pop_all.back().factorial_costs[i], pop_all.size() - 1));
     }
-    if(MTO)
+    if(args.MTO)
     {
         init_RMP(0.3);
     }
@@ -424,10 +369,6 @@ void initialized()
 void uninitialized()
 {
     pop_all.clear();
-    for(int i = 0; i < ntasks; i++)
-    {
-        record_tasks[i].Clear();
-    }
 }
 
 vector<Chro> variation()
@@ -484,7 +425,6 @@ vector<Chro> variation()
             }
         }else
         {
-            // printf("different skill factors p1 %d, p2 %d\n", p1.skill_factor, p2.skill_factor);
             /* select another unique individual the same as p1 */
             vector<int> sol1 = find_in_pop(pop_all, p1.skill_factor);
             int num_sol1 = sol1.size();
@@ -493,7 +433,6 @@ vector<Chro> variation()
             {
                 sel1 = sol1[random_.Permutate(num_sol1, 1)[0]];
             }
-            // printf("sub pop %d, size %d, p1 index %d, sel1 index %d\n", p1.skill_factor, num_sol1, inorder[idx_p1], sel1);
             Chro tmpc1;
             c1.elements = EA_solver->crossover(p1.elements, pop_all.at(sel1).elements, cf);
             tmpc1.elements = EA_solver->crossover(pop_all.at(sel1).elements, p1.elements, cf);
@@ -513,7 +452,6 @@ vector<Chro> variation()
             {
                 sel2 = sol2[random_.Permutate(num_sol2, 1)[0]]; 
             }
-            // printf("sub pop %d, size %d, p2 index %d, sel2 index %d\n", p2.skill_factor, num_sol2, inorder[idx_p2], sel2);
             Chro tmpc2;
             c2.elements = EA_solver->crossover(p2.elements, pop_all.at(sel2).elements, cf);
             tmpc2.elements = EA_solver->crossover(pop_all.at(sel2).elements, p2.elements, cf);
@@ -533,28 +471,17 @@ vector<Chro> variation()
 
 void reproduce()
 {
-    clock_t start = clock();
     vector<Chro> offspring = variation();
-    // fprintf(stderr, "offspring cost time %.3f s\n", (Real)(clock() - start) / CLOCKS_PER_SEC); 
-
-    start = clock();
-
-    // #pragma omp parallel
-    {   
-        // #pragma omp for
-        for (int i = 0; i < offspring.size(); i++)
-        {
-            Chro &c = offspring.at(i);
-            c.factorial_costs = vector<Real>(ntasks, DBL_MAX);
-            c.factorial_ranks = vector<int>(ntasks, 2 * pop_size + 1);
-            c.factorial_costs[c.skill_factor] = \
-                manytask_funs[c.skill_factor]->EvaluateFitness(c.elements); //, mutexes[c.skill_factor]
-        }
+    for (int i = 0; i < offspring.size(); i++)
+    {
+        Chro &c = offspring.at(i);
+        c.factorial_costs = vector<Real>(ntasks, DBL_MAX);
+        c.factorial_ranks = vector<int>(ntasks, 2 * pop_size + 1);
+        c.factorial_costs[c.skill_factor] = \
+            task_evals[c.skill_factor]->EvaluateFitness(c.elements);
     }
     evals += offspring.size();
-    // fprintf(stderr, "eval offspring cost time %.3f s\n", (Real)(clock() - start) / CLOCKS_PER_SEC); 
  
-    start = clock();
     vector<Chro> inter_pop;
     inter_pop.insert(inter_pop.end(), pop_all.begin(), pop_all.end());
     inter_pop.insert(inter_pop.end(), offspring.begin(), offspring.end());
@@ -577,7 +504,7 @@ void reproduce()
         vector<int> &ranks = inter_pop[i].factorial_ranks;
         int min_idx = inter_pop[i].skill_factor;
         int min_rank = ranks[min_idx];
-        if (MTO){
+        if (args.MTO){
             for(int k = 0; k < ranks.size(); k++)
             {
                 if(ranks[k] < min_rank)
@@ -587,34 +514,12 @@ void reproduce()
                 }
             }
         }
-        if(min_idx != inter_pop[i].skill_factor && !MTO)
-        {
-            vector<int> sub_pop_0 = find_in_pop(inter_pop, 0);
-            vector<int> sub_pop_1 = find_in_pop(inter_pop, 1);
-            fprintf(stderr, "inter_pop_index %d skill factor shift, transfer of skill factor %d -> %d\n",
-                 i, inter_pop[i].skill_factor, min_idx);
-            stringstream ss;
-            for(const auto &e : inter_pop[i].factorial_costs)
-            {
-                ss << e << ", ";
-            }
-            fprintf(stderr, "factorial costs %s\n", ss.str().c_str());
-            ss.str("");
-            for(const auto &e : inter_pop[i].factorial_ranks)
-            {
-                ss << e << ", ";
-            }
-            fprintf(stderr, "factorial ranks %s\n", ss.str().c_str());
-        }
         inter_pop[i].skill_factor = min_idx;
         inter_pop[i].scalar_fitness = 1.0 / ranks[min_idx];
         tmp_vec[i] = inter_pop[i].scalar_fitness;
     }
-    // fprintf(stderr, "scalacr fitness cost time %.3f s\n", (Real)(clock() - start) / CLOCKS_PER_SEC); 
 
-    clock_t sort_start = clock();
     vector<int> sorted_pop_indices = argsort(tmp_vec);
-    // fprintf(stderr, "sort cost time %.3f s\n", (Real)(clock() - sort_start) / CLOCKS_PER_SEC);
     for(int i = 0; i < pop_size; i++)
     {
         int sort_id = sorted_pop_indices[inter_pop_size - i - 1];
@@ -632,24 +537,16 @@ void reproduce()
 void MFEA()
 {
 	initialized();
-	generation = 0;
+	int generation = 0;
     Real bestf = 0;
 
-	while (generation < MAX_GENS)
+	while (generation < args.Gmax)
     {
-        double start = get_wall_time();
-	    if (MTO)
+	    if (args.MTO && MFEA2)
 	    {
-        	// 1
-        	// auto t_start = std::chrono::high_resolution_clock::now();
        	 	update_RMP(pop_all);
-        	// auto t_end = std::chrono::high_resolution_clock::now();
-        	// printf("update rmp cost time %.3f ms\n", std::chrono::duration<double, std::milli>(t_end-t_start).count());
 	    }
-        // 2
         reproduce();
-
-		//Print the current best
 		if ((generation + 1) % args.record_interval == 0
              || (generation == 0))
         {
@@ -657,30 +554,15 @@ void MFEA()
             {
                 Chromosome ind = pop_all.at(best_objs.at(i).second);
                 bestf = best_objs.at(i).first;
-                fprintf(stderr, "island %d; runs %d/%d; gens %d/%d; bestf %.12f\n", i, job+1, RUNS, generation+1, MAX_GENS, bestf);
-                //  stringstream ss;
-                //  for(int k = 0; k < ntasks; k++)
-                //  {
-                //      if(k != ntasks - 1)
-                //      {
-                //          ss << RMP[i][k] << ", ";
-                //      }else
-                //      {
-                //          ss << RMP[i][k];
-                //      }
-                // }
-                // fprintf(stdout, "island %d RMPs; runs %d/%d; gens %d/%d: [%s].\n",
-                //      i, job+1, RUNS, generation+1, MAX_GENS, ss.str().c_str());
-
+                fprintf(stderr, "task id %d; runs %d/%d; gens %d/%d; bestf %.12f\n", 
+                    i+1, run_id+1, args.total_runs, generation+1, args.Gmax, bestf);
                 RecordInfo info;
                 info.best_fitness = bestf;
                 info.generation = generation+1;
-                // info.elements = ind.elements;
                 record_tasks[i].RecordInfos(info);
             }
         }
         generation++;
-        cerr << "one generation cost time " << get_wall_time() - start << endl;
 	}
     for (int i = 0; i < ntasks; i++)
     {
@@ -692,8 +574,9 @@ void MFEA()
         {
             ss << e << ", ";
         }
-        fprintf(stderr, "island %d run_id %d, final results: [%s %.12f] \n", i, job+1, ss.str().c_str(), bestf);
-        record_tasks[i].FlushInfos(job);
+        fprintf(stderr, "task %d run_id %d, final results: [%s]; bestf %.12f \n", i+1, run_id+1, ss.str().c_str(), bestf);
+        record_tasks[i].FlushInfos(run_id);
+        record_tasks[i].Clear();
     }
     
     uninitialized();
@@ -701,18 +584,16 @@ void MFEA()
 }
 int main(int argc, char* argv[])
 {
-    auto t_start = std::chrono::high_resolution_clock::now();
-    omp_set_num_threads(8);
+    auto t_start = get_wall_time();
     global_init(argc, argv);
-	for (job = 7; job < RUNS; job++)
+	for (run_id = 0; run_id < args.total_runs; run_id++)
 	{
-		srand((job+1)*10000);
+		srand((run_id+1)*10000);
 		MFEA();
-        auto t_end = std::chrono::high_resolution_clock::now(); 
-        cerr << (job + 1) << " run cost time " << std::chrono::duration<double, std::milli>(t_end-t_start).count() / 1000.0 << " s\n";
+        cerr << run_id + 1 << " run cost time " << get_wall_time() - t_start
+             << " seconds" << endl;
 	}
-    global_deinit();
-    auto t_end = std::chrono::high_resolution_clock::now();
-	cerr << "total wall clock time: " << std::chrono::duration<double, std::milli>(t_end-t_start).count() / 1000.0 << " s for " << RUNS << " RUNS" << endl;
+	cerr << "total wall clock time: " << get_wall_time() - t_start 
+         << " seconds for " << args.total_runs << " runs" << endl;
 	return 0;
 }

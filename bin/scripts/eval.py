@@ -1,6 +1,4 @@
-# import pingouin as pg
 import numpy as np
-from numpy.core.records import array
 from scipy.stats import ranksums
 import scipy
 
@@ -67,9 +65,6 @@ def wilcoxon_test(x1, x2, alpha=0.05):
         mean_value = (np.mean(x1), np.mean(x2))
     else:
         mean_value = (np.mean(x1), np.mean(x2))
-        # is_equal = pg.wilcoxon(x1, x2, tail='two-sided')
-        # w = is_equal["W-val"].tolist()[0]
-        # p_value = is_equal["p-val"].tolist()[0]
         is_equal = ranksums(x1, x2)
         w = is_equal[0]
         p_value = is_equal[1]
@@ -137,40 +132,49 @@ def f1_scores(results):
     params results: [result1, result2, ...]
     return score values: [res1, res2, res3, res4]
     """
-
-    Valid_Score = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
+    Valid_Score = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1] # according to F1 race
     res_np = np.array(results)
     scores = [0] * len(results)
-
-    res_np_median = np.mean(res_np, axis=1)
-    # res_np_median = np.median(res_np, axis=1)
+    res_np_median = np.median(res_np, axis=1)
     ranks = np.argsort(res_np_median.T)
-
     for j, r in enumerate(ranks):
-        # scores[r] = Valid_Score[j]
-        scores[r] = j + 1
-
+        scores[r] = Valid_Score[j]
     return scores
 
 
-if __name__ == '__main__':
+def mean_rank_scores(results):
+    """ calculate the mean rank values scores of each algorithm
+    params results: [result1, result2, ...]
+    return score values: [res1, res2, res3, res4]
+    """
+    res_np = np.array(results)
+    scores = [0] * len(results)
+    res_np_mean = np.mean(res_np, axis=1) # use mean rank
+    ranks = np.argsort(res_np_mean.T)
+    for j, r in enumerate(ranks):
+        scores[r] = j + 1 # mean rank value
+    return scores
+
+
+# if __name__ == '__main__':
+#     pass
     # test suit 3
-    mean_ranks = [a/6.0 for a in [10.72, 23.60, 16.14, 26.54, 21.00, 28.00]]
+    # mean_ranks = [a/6.0 for a in [10.72, 23.60, 16.14, 26.54, 21.00, 28.00]]
     # test suite 2
     # mean_ranks = [a/4.0 for a in [5.20, 9.10, 13.50, 12.20]]
     # test suit 1
     # mean_ranks = [a/9.0 for a in [13.50, 20.50, 20.00]]
 
-    ranks_testsuite1 = np.array([23.50, 30.00, 28.50, 37.50, 38.50,
-                                 31.00]) * 2  # 9
-    ranks_manytask10 = np.array([1.5, 3.75, 3.175, 4.125, 3.95, 4.5]) * 40  # 4
-    ranks_matde_problem = np.array([1.20, 4.70, 2.90, 4.80, 3.70, 3.70]) * 10  # 1
-    ranks_cec50 = np.array([10.72, 23.60, 16.14, 26.54, 21.00, 28.00]) * 50  # 6
-    total_mean_ranks = (ranks_cec50 + ranks_manytask10 +
-                        ranks_matde_problem + ranks_testsuite1) / (18 + 50 + 300)
-    print(['%.2f' % x for x in total_mean_ranks])
+    # ranks_testsuite1 = np.array([23.50, 30.00, 28.50, 37.50, 38.50,
+    #                              31.00]) * 2  # 9
+    # ranks_manytask10 = np.array([1.5, 3.75, 3.175, 4.125, 3.95, 4.5]) * 40  # 4
+    # ranks_matde_problem = np.array([1.20, 4.70, 2.90, 4.80, 3.70, 3.70]) * 10  # 1
+    # ranks_cec50 = np.array([10.72, 23.60, 16.14, 26.54, 21.00, 28.00]) * 50  # 6
+    # total_mean_ranks = (ranks_cec50 + ranks_manytask10 +
+    #                     ranks_matde_problem + ranks_testsuite1) / (18 + 50 + 300)
+    # print(['%.2f' % x for x in total_mean_ranks])
 
-    print(mean_ranks)
+    # print(mean_ranks)
     # mean_ranks = [3.0, 3.7, 4.5, 3.9, 4.1, 4.6, 4.2]
     # mean_ranks = [1.44, 1.56, 3.0, 4.0, 6.36, 5.0, 6.64]
     # mean_ranks = [1.10, 1.89]

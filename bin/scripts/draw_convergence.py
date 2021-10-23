@@ -6,7 +6,6 @@ import numpy as np
 import os.path as osp
 import os
 
-from matplotlib.pyplot import MultipleLocator
 from parse_results import (read_tasks_results_from_json,
                            get_tasks_fitness)
 
@@ -70,9 +69,6 @@ def draw_convergence_one_problem_multi_algorithms(
     plt.ylabel('$log_{10}(FEV)$', fontdict=fontdict)
     plt.xticks(fontproperties='Times New Roman', fontsize=24)
     plt.yticks(fontproperties='Times New Roman', fontsize=24)
-    # y_major_locator = MultipleLocator(1)
-    # ax = plt.gca()
-    # ax.yaxis.set_major_locator(y_major_locator)
     plt.savefig(save_file)
     plt.close()
     print('save image file to {}'.format(save_file))
@@ -105,24 +101,15 @@ def draw_averaged_convergence(results,
 
     grid = calculate_grids(ntasks)
 
-    # draw averaged convergence
-    # plt.figure(figure_index, figsize=(8, 6.5))
     fig = plt.figure(figsize=(8, 6.5))
-    # left, bottom, width, height (range 0 to 1)
     left, bottom = 0.2, 0.15
     ax = fig.add_axes([left, bottom, (1 - left) * 0.9, (1 - bottom) * 0.9])
-    # plt.figure(figsize=(5, 4))
     k = 0
     for i in range(grid[0]):
         for j in range(grid[1]):
             if (k == len(task_ids)):
                 break
             curr_task = task_ids[k]
-
-            # plt.subplot(grid[0], grid[1], k + 1)
-            # plt.subplots_adjust(wspace=0.8, hspace=0.8)
-            # plt.title("$T_{%s}$" % str(curr_task), fontsize=14,
-            #           fontdict=fontdict)
 
             for i, res in enumerate(results):
                 fitness = [obj["fitness_values"] for obj in res[curr_task]]
@@ -185,7 +172,6 @@ def draw_normalized_scores_convergence(
     }
     print_interval = 1
     show_interval = 10
-    # plt.figure(figsize=(8, 6.5))
     fig = plt.figure(figsize=(8, 6.5))
     # left, bottom, width, height (range 0 to 1)
     left, bottom = 0.15, 0.15
@@ -225,6 +211,7 @@ if __name__ == "__main__":
     task_ids = range(1, 11)
     problems = ['zero_10']
     problem_save_root = 'matde_problem'
+
     # mto benchmark
     results_dirs = [
         'Results/benchmark/smto/DE/deepinsight/mto/{}',
@@ -261,14 +248,6 @@ if __name__ == "__main__":
                 res.format(show_tag))
             for res in results_dirs
         ]
-        ''' draw normalized scores convergence'''
-        # fitness_results = [
-        #     get_tasks_fitness(res)
-        #     for res in results
-        # ]
-        # save_file = osp.join(save_dir, 'norm_conv_{}.pdf'.format(show_tag))
-        # draw_normalized_scores_convergence(fitness_results, labels, save_file)
-
         for task in task_ids:
             save_file = osp.join(save_dir, 'conv_{}.pdf'.format(task))
             draw_averaged_convergence(

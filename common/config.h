@@ -38,6 +38,10 @@ struct Individual
 	vector<Real> elements;
 	Real fitness_value;
 	int skill_factor;
+	Individual() {};
+	Individual(int dim) {
+		elements.resize(dim, 0);
+	};
 };
 
 typedef vector<Individual> Population;
@@ -46,43 +50,31 @@ struct Args
 {
     int total_runs {1};
     int record_interval {1};
-	int G_max {100};
+	int Gmax {100};
 	int UDim {50};
 	int popsize {100};
     vector<int> total_tasks;
 	string problem_set;
 	string problem_name;
-    string params_file;
     string results_dir;
-    string results_subdir;
     bool MTO {true};
 };
 
 struct ProblemInfo
 {
-	int dim;
 	int task_id;
-	int run_ID;
-	int total_runs;
-	string problem_def;
-	string benchfunc_name;
+	int dim;
+	int calc_dim; 
+	Real max_bound{1.0};
+	Real min_bound{0.0};
+	string benchfunc_name; //benchmark func name
 
-	Real max_bound; //search max bound
-	Real min_bound; //search min bound
-
-	//shift and rotation data
+	//shift and rotation data file
 	string shift_data_file;
 	string rotation_data_file;
 	string arm_data_file;
-		
-	int is_rotate;
-	int calc_dim; 
 };
 
-struct IslandInfo
-{
-	int island_size;
-};
 
 #endif
 

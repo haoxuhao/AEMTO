@@ -8,106 +8,65 @@
 
 using namespace std;
 
-bool MTO = true;// 0 for no transfer; 1 for transfer
-
-int generation;	//current generation
-int	evals;	//Evaluation times
-int job;	//Current run number
-int ntasks;
-int RUNS = 1;
-int MAX_GENS = 1000;
-long MAX_EVALS = 100000;
-
-vector<unique_ptr<Evaluator>> manytask_funs;
-vector<IslandInfo> island_infos;
+int	evals = 0;	//evaluation times
+int run_id;	
+int ntasks = 1;
+vector<unique_ptr<Evaluator>> task_evals;
 vector<ProblemInfo> problem_infos;
-vector<EAInfo> ea_infos;
 vector<Population> pop_tasks;
 vector<Record> record_tasks;
 Random random_;
-string result_dir;
 Args args;
-
-EA *EA_solver;
+EAInfo EA_info;
+unique_ptr<EA> EA_solver;
 
 /*SBO matrixs*/
 vector<vector<Real>> M, N, C, O, P, A, R;
 
 int global_init(int argc, char* argv[])
 {
-    IslandInfo island_info;
-    ProblemInfo problem_info;
-    EAInfo EA_info;
-    int ret = SetParameters(island_info, problem_info,  \
-            EA_info, args, argc, argv);
-    
+    int ret = SetParameters(argc, argv, args, EA_info);
     if(ret != 0)
     {
         fprintf(stderr,"Error: set parameters error.\n");
         exit(-1);
     }
-    
-    result_dir = args.results_dir + "/" + args.results_subdir;
     mkdirs(args.results_dir.c_str());
-    mkdirs(result_dir.c_str());
-
-    RUNS = args.total_runs;
-
-    for(int i=0; i<args.total_tasks.size(); i++)
-    {
-        problem_info.task_id = args.total_tasks[i];
-        problem_info.total_runs = args.total_runs;
-        if(GetProblemInfo(args, problem_info) != 0) 
+    args.total_runs = args.total_runs;
+    problem_infos = GetProblemInfos(args);
+    for (int i  = 0; i < args.total_tasks.size(); i++) {
+        if (args.problem_set == "Arm")
         {
-            fprintf(stderr, "Error: task %d, get task info error from.\n", problem_info.task_id);
-            return -1;
+            unique_ptr<Evaluator> eval_func(new ArmEvaluator(problem_infos[i]));
+            task_evals.push_back(std::move(eval_func));
+        } else {
+            unique_ptr<Evaluator> eval_func(new BenchFuncEvaluator(problem_infos[i]));
+            task_evals.push_back(std::move(eval_func));
         }
-        if (problem_info.problem_def == "Arm")
-        {
-            unique_ptr<Evaluator> eval_func(new ArmEvaluator(problem_info));
-            manytask_funs.push_back(std::move(eval_func));
-        }else {
-            unique_ptr<Evaluator> eval_func(new BenchFuncEvaluator(problem_info));
-            manytask_funs.push_back(std::move(eval_func));
-        }
-        Record record = Record(args, args.total_tasks[i]);
-        record_tasks.push_back(record);
-
-        island_infos.push_back(island_info);
-        ea_infos.push_back(EA_info);
-        problem_infos.push_back(problem_info);
+        record_tasks.emplace_back(args, args.total_tasks[i]);
+        problem_infos.push_back(problem_infos[i]);
     }
 
-    MAX_GENS = args.G_max;
     ntasks = (int)args.total_tasks.size();
     fprintf(stderr, "=================== INFO ============\n");
-    fprintf(stderr, "total tasks = %d; total runs = %d\n", ntasks, RUNS);
-    fprintf(stderr, "pop_sizexm = %dx%d\n", island_info.island_size, ntasks);
-    fprintf(stderr, "MAX_GENS = %d\n", MAX_GENS);
-    fprintf(stderr, "results dir = %s\n", result_dir.c_str());
+    fprintf(stderr, "total tasks = %d; total runs = %d\n", ntasks, args.total_runs);
+    fprintf(stderr, "pop_sizexm = %dx%d\n", args.popsize, ntasks);
+    fprintf(stderr, "args.Gmax = %d\n", args.Gmax);
+    fprintf(stderr, "results dir = %s\n", args.results_dir.c_str());
     fprintf(stderr, "EA solver = %s.\n", EA_info.STO.c_str());
-    fprintf(stderr, "MTO = %d\n", MTO);
+    fprintf(stderr, "MTO = %d\n", args.MTO);
 
     if (EA_info.STO == "GA")
-	{
-		EA_solver = new GA_CPU();
-        EA_solver->Initialize(island_info, problem_info, EA_info);
-        
-	}else if (EA_info.STO == "DE")
     {
-        EA_solver = new DE_CPU();
-        EA_solver->Initialize(island_info, problem_info, EA_info);
+        EA_solver.reset(new GA(problem_infos[0], EA_info));
+    }else if (EA_info.STO == "DE")
+    {
+        EA_solver.reset(new DE(problem_infos[0], EA_info));
     }
-     else{
+    else{
         fprintf(stderr, "Error no EA solver found: %s.\n", EA_info.STO.c_str());
         exit(-1);
     }
-    return 0;
-}
-
-int global_deinit()
-{
-    delete EA_solver;
     return 0;
 }
 
@@ -138,30 +97,23 @@ int update_SB_matrix(int i, int j, Real rate_i, Real rate_j)
     if (rate_i <= bene_rate && rate_j <= bene_rate)
     {
         M[i][j]++;
-        // fprintf(stderr, "(rate_i, rate_j)= (%.4f, %.4f), update M\n", rate_i, rate_j);
     }else if (rate_i <= bene_rate && rate_j <= harm_rate)
     {
         O[i][j]++;
-        // fprintf(stderr, "(rate_i, rate_j)=(%.4f, %.4f), update O\n", rate_i, rate_j);
     }else if (rate_i <= bene_rate && rate_j > harm_rate)
     {
         P[i][j]++;
-        // fprintf(stderr, "(rate_i, rate_j)=(%.4f, %.4f), update P\n", rate_i, rate_j);
     }
     else if (rate_i <= harm_rate && rate_j <= harm_rate)
     {
         N[i][j]++;
-        // fprintf(stderr, "(rate_i, rate_j)=(%.4f, %.4f), update N\n", rate_i, rate_j);
     }else if (rate_i <= harm_rate && rate_j > harm_rate)
     {
         A[i][j]++;
-        // fprintf(stderr, "(rate_i, rate_j)=(%.4f, %.4f), update A\n", rate_i, rate_j);
     }else if (rate_i > harm_rate && rate_j > harm_rate)
     {
         C[i][j]++;
-        // fprintf(stderr, "(rate_i, rate_j)=(%.4f, %.4f), update C\n", rate_i, rate_j);
     }else {
-        // fprintf(stderr, "undefined rules for rate (i, j) = (%f, %f)\n", rate_i, rate_j);
         return 1;
     }
     return 0;
@@ -223,7 +175,8 @@ void initialized()
     pop_tasks.resize(ntasks, Population());
     for (int i = 0; i < ntasks; i++)
     {
-        EA_solver->InitializePopulation(pop_tasks[i], manytask_funs[i]);
+        pop_tasks[i].resize(args.popsize, Individual(args.UDim));
+        EA_solver->InitializePopulation(pop_tasks[i], task_evals[i]);
         evals += pop_tasks[i].size();
     }
     // SBO matrix init
@@ -237,7 +190,7 @@ void initialized()
         A.emplace_back(vector<Real>(ntasks, 1));
         R.emplace_back(vector<Real>(ntasks, 0));
     }
-    if(MTO)
+    if(args.MTO)
         update_R();
 }
 
@@ -256,12 +209,12 @@ void uninitialized()
 void SBO()
 {
 	initialized();
-	generation = 0;
+	int generation = 0;
     Real bestf = 0;
     int rank_i, rank_j, j;
     Real origin_fitness;
 
-	while (generation < MAX_GENS){
+	while (generation < args.Gmax){
         vector<Population> offsprings;
 		for (int i = 0; i < ntasks; i++){
             Population offsp = EA_solver->Variation(pop_tasks[i]);
@@ -269,7 +222,7 @@ void SBO()
 		}
         for (int i = 0; i < ntasks; i++)
         {
-            if (MTO)
+            if (args.MTO)
             {
                 j = argmax(R[i], i);
                 Real Ri = R[i][j];
@@ -288,12 +241,12 @@ void SBO()
                 }
             }
             
-            offsprings[i] = EA_solver->EvaluatePop(offsprings[i], manytask_funs[i]);
+            offsprings[i] = EA_solver->EvaluatePop(offsprings[i], task_evals[i]);
             EvolveRewards rewards;
             pop_tasks[i] = EA_solver->Survival(pop_tasks[i], offsprings[i], rewards);
             offsprings[i] = EA_solver->SortPop(offsprings[i]);
         }
-        if (MTO){
+        if (args.MTO){
             // update M,N...
             for (int i = 0; i < ntasks; i++)
             {
@@ -307,18 +260,12 @@ void SBO()
                     {
                         total_transfered ++;
                         rank_i = k;
-                        origin_fitness = manytask_funs[j]->EvaluateFitness(offsprings[i][k].elements);
+                        origin_fitness = task_evals[j]->EvaluateFitness(offsprings[i][k].elements);
                         rank_j = rank_in_pop(offsprings[j], origin_fitness);
-                        // printf("run id %d, gens %d, island %d, curr FV %.6f; rank i %d, rank j(%d) %d, FV of j %.6f\n", 
-                        //     job+1, generation+1, i, offsprings[i][k].fitness_value, rank_i,
-                        //     j, rank_j, origin_fitness);
                         undefined_rule += update_SB_matrix(i, j,
                             rank_i / (Real)lambda, rank_j / (Real)lambda);
                     }
                 }
-                // if (total_transfered != 0)
-                //     printf("run id %d, gens %d, island %d: transferred %d, undefined rule %d, undefined rate %.4f\n",
-                //         job+1, generation+1, i, total_transfered, undefined_rule, undefined_rule / (Real)(total_transfered + 1e-12));
             }
             // update R
             update_R();
@@ -331,7 +278,7 @@ void SBO()
             {
                 Individual ind = EA_solver->FindBestIndividual(pop_tasks[i]);
                 bestf = ind.fitness_value; 
-                fprintf(stderr, "island %d; runs %d/%d; gens %d/%d; bestf %.12f\n", i, job+1, RUNS, generation+1, MAX_GENS, bestf);
+                fprintf(stderr, "task %d; runs %d/%d; gens %d/%d; bestf %.12f\n", i+1, run_id+1, args.total_runs, generation+1, args.Gmax, bestf);
                 stringstream ss;
                 for(int k = 0; k < ntasks; k++)
                 {
@@ -343,9 +290,9 @@ void SBO()
                         ss << R[i][k];
                     }
                 }
-                if (i == 0)
-                    fprintf(stdout, "island %d selection probability; runs %d/%d; gens %d/%d: [%s].\n",
-                        i, job+1, RUNS, generation+1, MAX_GENS, ss.str().c_str());
+                // if (i == 0)
+                //     fprintf(stdout, "task %d selection probability; runs %d/%d; gens %d/%d: [%s].\n",
+                //         i+1, run_id+1, args.total_runs, generation+1, args.Gmax, ss.str().c_str());
 
                 RecordInfo info;
                 info.best_fitness = bestf;
@@ -365,8 +312,8 @@ void SBO()
         {
             ss << e << ", ";
         }
-        fprintf(stderr, "island %d run_id %d, final results: [%s %.12f] \n", i, job+1, ss.str().c_str(), bestf);
-        record_tasks[i].FlushInfos(job);
+        fprintf(stderr, "task %d run_id %d, final results: [%s %.12f] \n", i+1, run_id+1, ss.str().c_str(), bestf);
+        record_tasks[i].FlushInfos(run_id);
     }
     
     uninitialized();
@@ -376,17 +323,17 @@ int main(int argc, char* argv[])
 {
 	double duration;
 	double total = 0;
-	clock_t start = clock();
+	auto start = get_wall_time();
 
     global_init(argc, argv);
-	for (job = 0; job < RUNS; job++)
+	for (run_id = 0; run_id < args.total_runs; run_id++)
 	{
         double time_s = get_wall_time();
-		srand((job+1)*10000);
+		srand((run_id+1)*10000);
 		SBO();
         cout << "one run cost time " << get_wall_time() - time_s << endl;
 	}
-	cout << "total time cost: " << (double)(clock() - start) / CLOCKS_PER_SEC << " s for " << RUNS << " RUNS" << endl;
-    global_deinit();
+	cout << "total time cost: " << get_wall_time() - start
+         << " seconds for " << args.total_runs << " runs" << endl;
 	return 0;
 }
