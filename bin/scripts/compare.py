@@ -1,13 +1,10 @@
 # !/bin/env python
-# -*- coding: UTF-8 -*-
-
 import copy
 import numpy as np
 import pandas as pd
 
 from eval import get_overall_comparisons, COMP_TAG
 from parse_results import get_results, DECIMALS
-from tqdm import tqdm
 
 
 def overall_compare(results, runs=15, algos=None):
@@ -152,12 +149,13 @@ def summeray_compare(
             f1_scores_total[i] += f1_scores_[i]
 
     total_detailed_res_df.to_csv(save_file)
+    print('save detailed comparison to file {}'.format(save_file))
 
     return (total_summeray, normalized_scores_total, f1_scores_total)
 
 
 def build_comparisons():
-    algos = ['AEMTO', 'SBO', 'MFEA', 'MATDE', 'STO']
+    algos = ['AEMTO', 'SBO', 'MFEA', 'MATDE', 'STO'] # STO is AEMTO --MTO 0
     problem_set = 'matde_problem'
     problem_name = "zero_10"
     compared_res = {

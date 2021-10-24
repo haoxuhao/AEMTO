@@ -199,54 +199,26 @@ def draw_normalized_scores_convergence(
 
 
 if __name__ == "__main__":
-    # matde
+    problem_set = 'matde_problem'
+    algos = ['AEMTO', 'SBO', 'MFEA', 'MATDE', 'STO'] # STO is AEMTO --MTO 0
     results_dirs = [
-        'Results/matde_problem/smto/DE/deepinsight/mto/{}',
-        'Results/matde_problem/smto/DE/deepinsight/mto_ada_tsf_uni_sel/{}',
-        'Results/matde_problem/smto/DE/deepinsight/mto_fixed_tsf_uni_sel/{}',
-        'Results/matde_problem/smto/DE/deepinsight/sto/{}'
+        'Results/{}/matde_problem'.format(algo)
+            for algo in algos
     ]
-    labels = ['AEMTO', 'AEMTO (w/o aSel)',
-              'AEMTO (w/o aTsf and aSel)', 'STO']
+    labels = algos
     task_ids = range(1, 11)
     problems = ['zero_10']
     problem_save_root = 'matde_problem'
 
-    # mto benchmark
-    results_dirs = [
-        'Results/benchmark/smto/DE/deepinsight/mto/{}',
-        'Results/benchmark/smto/DE/deepinsight/mto_fixed_tsf/{}',
-        'Results/benchmark/smto/DE/deepinsight/sto/{}',
-    ]
-    labels = ['AEMTO', 'AEMTO (w/o aTsf)', 'STO']
-    task_ids = range(1, 3)
-    problems = ['problem{}_2'.format(id) for id in range(1, 10)]
-    problem_save_root = 'mtobenchmark'
-
-    # manytask10
-    # results_dirs = [
-    #     'Results/ManyTask10/smto/DE/deepinsight/mto/{}',
-    #     'Results/ManyTask10/smto/DE/deepinsight/mto_ada_tsf_uni_sel/{}',
-    #     'Results/ManyTask10/smto/DE/deepinsight/mto_fixed_tsf_uni_sel/{}',
-    #     'Results/ManyTask10/smto/DE/deepinsight/sto/{}'
-    # ]
-    # labels = ['AEMTO', 'AEMTO (w/o aSel)',
-    #           'AEMTO (w/o aTsf and aSel)', 'STO']
-    # task_ids = range(1, 11)
-    # tags = ['zero', 'small', 'median', 'large']
-    # problems = ['{}_10'.format(tag) for tag in tags]
-    # problem_save_root = 'manytask10'
-
     save_root = 'tmp/convergence/{}/{}'
     assert len(labels) == len(results_dirs)
-    for show_tag in problems:
-        save_dir = save_root.format(problem_save_root, show_tag)
+    for problem in problems:
+        save_dir = save_root.format(problem_save_root, problem)
         if not osp.exists(save_dir):
             os.makedirs(save_dir)
         results = [
-            read_tasks_results_from_json(
-                res.format(show_tag))
-            for res in results_dirs
+            read_tasks_results_from_json(res + '/{}'.format(problem))
+                for res in results_dirs
         ]
         for task in task_ids:
             save_file = osp.join(save_dir, 'conv_{}.pdf'.format(task))
@@ -254,7 +226,7 @@ if __name__ == "__main__":
                 results, labels=labels, task_ids=[task],
                 save_file=save_file)
         if problem_save_root == 'mtobenchmark':
-            save_file = osp.join(save_dir, 'conv_{}.pdf'.format(show_tag))
+            save_file = osp.join(save_dir, 'conv_{}.pdf'.format(problem))
             draw_convergence_one_problem_multi_algorithms(results,
                                                           labels=labels,
                                                           save_file=save_file,

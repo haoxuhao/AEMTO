@@ -52,18 +52,18 @@ int SetParameters(int argc, char** argv, Args &args, EAInfo &EA_info)
 {
     CmdParser cmd_parser(argc, argv);
     args.results_dir = cmd_parser.getCmdOption("-results_dir", "Results/" + time_now());
-    args.problem_set = cmd_parser.getCmdOption("-problem_set", "Arm");
+    args.problem_set = cmd_parser.getCmdOption("-problem_set", "matde_problem");
     args.problem_name = cmd_parser.getCmdOption("-problem_name", "zero");
     args.UDim = cmd_parser.getCmdOption("-UDim", 50);
-    args.popsize = cmd_parser.getCmdOption("-popsize", 20);
-    args.record_interval = cmd_parser.getCmdOption("-record_interval", 1);
+    args.popsize = cmd_parser.getCmdOption("-popsize", 100);
+    args.record_interval = cmd_parser.getCmdOption("-record_interval", 100);
     args.total_runs = cmd_parser.getCmdOption("-total_runs", 1);
-    args.Gmax = cmd_parser.getCmdOption("-Gmax", 100);
+    args.Gmax = cmd_parser.getCmdOption("-Gmax", 1000);
     args.MTO = cmd_parser.getCmdOption("-MTO", 1);
-    string total_tasks_str = cmd_parser.getCmdOption("-total_tasks", "1-100");
+    string total_tasks_str = cmd_parser.getCmdOption("-total_tasks", "1-10");
     if(total_tasks_str.find("-") != total_tasks_str.npos) {
         vector<string> tmp = split(total_tasks_str, '-');
-        for(int i = stoi(tmp[0]); i < stoi(tmp[1]) + 1; i++) {
+        for(int i = stoi(tmp[0]); i <= stoi(tmp[1]); i++) {
             args.total_tasks.push_back(i);
         }
     }
@@ -95,7 +95,7 @@ int SetParameters(int argc, char** argv, Args &args, EAInfo &EA_info)
          << "unified search space dims " << args.UDim << "\n"
          << "total runs " << args.total_runs << "\n"
          << "pop size " << args.popsize << "\n"
-         << "Gmax " << args.popsize << "\n"
+         << "Gmax " << args.Gmax << "\n"
          << "record interval " << args.record_interval << "\n"
          << "results dir " << args.results_dir << "\n"
          << "===========================" << endl;

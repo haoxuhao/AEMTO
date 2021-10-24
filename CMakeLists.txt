@@ -45,7 +45,7 @@ message(STATUS "build ${exec_name}")
 ADD_EXECUTABLE(${exec_name} ${main_file} ${DIR_SRCS})
 TARGET_LINK_LIBRARIES(${exec_name} ${CMAKE_THREAD_LIBS_INIT})
 
-set(exec_name MFEA)
+set(exec_name MFEA2)
 set(main_file "main/mfea.cc")
 message(STATUS "build ${exec_name}")
 ADD_EXECUTABLE(${exec_name} ${main_file} ${DIR_SRCS})

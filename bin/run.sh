@@ -49,7 +49,7 @@ record_interval=100 # generation interval for Arm problem; 1 for Arm problem
 MTO=1 # 0 for STO results
 popsize=100 # population size, 20 for Arm problem
 
-# executables: [AEMTO, MATDE, SBO, MFEA];
+# executables: [AEMTO, MATDE, SBO, MFEA2];
 executable="./AEMTO" 
 
 for tag in ${tags[@]}

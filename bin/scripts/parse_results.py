@@ -34,7 +34,7 @@ def read_tasks_results_from_json(results_dir):
     return parsed_results
 
 
-def get_mean_solutions(res, task_ids=[1], runs=30):
+def get_mean_solutions(res, task_ids=[1], runs=-1):
     solutions = {}
     for task in task_ids:
         s = [obj["best_solutions"] for obj in res[task][:runs]]
