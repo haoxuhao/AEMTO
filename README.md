@@ -18,10 +18,10 @@ mkdir build && cd build && cmake .. && make -j
 cd ../bin
 ./AEMTO # && ./MATDE && ./SBO && ./MFEA2
 ```
-The detailed results are recorded in `bin/Results/*/*.json`. Json results file can be opened directly by common text editor or parse by most programing language.
+The detailed results are recorded in `bin/Results/*/*.json`. Json results file can be opened directly by common text editor or parsed by most programming languages.
 
 ## Others
-File `bin/run.sh` lists some useful information to do experiments. Directory `bin/scripts` contains some python scripts to compare and visualize the results of different algorithms.
+File `bin/run.sh` lists some useful information to do experiments. Directory `bin/scripts` contains the python scripts to compare and visualize the results of different algorithms.
 
 # Acknowledgements
 Open source softwares in `oss`: 
